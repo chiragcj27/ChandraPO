@@ -5,6 +5,7 @@ import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ValueFormatterParams, ICellRendererParams } from "ag-grid-community";
 import type { PurchaseOrder } from "../types/po";
 import { useRouter } from "next/navigation";
+import { getApiEndpoint } from "@/lib/api";
 
 // AG Grid styles
 import "ag-grid-community/styles/ag-grid.css";
@@ -46,7 +47,7 @@ export default function DashboardPage() {
 
   const loadPOs = async () => {
     try {
-      const res = await fetch("http://localhost:4000/api/pos");
+      const res = await fetch(getApiEndpoint("/api/pos"));
       const data: PurchaseOrder[] = await res.json();
       setRowData(data);
     } catch {
@@ -64,7 +65,7 @@ export default function DashboardPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("http://localhost:4000/api/pos/upload", {
+      const res = await fetch(getApiEndpoint("/api/pos/upload"), {
         method: "POST",
         body: form,
       });

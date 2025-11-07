@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PurchaseOrder, POItem } from "@/types/po";
 import ItemCard from "../components/ItemCard";
+import { getApiEndpoint, getApiUrl } from "@/lib/api";
 
 // Mock data for fallback
 async function getMockPO(poNumber: string): Promise<PurchaseOrder | null> {
@@ -45,7 +46,7 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
         
         // Try to fetch from API first
         try {
-          const res = await fetch(`http://localhost:4000/api/pos/${decodedPoNumber}`);
+          const res = await fetch(getApiEndpoint(`/api/pos/${decodedPoNumber}`));
           if (res.ok) {
             const data: PurchaseOrder = await res.json();
             setPo(data);
@@ -61,7 +62,8 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
                 setPdfUrl(pdfPath);
               } else {
                 // Assume it's a relative path, construct the API URL
-                setPdfUrl(`http://localhost:4000/api/pos/${decodedPoNumber}/pdf?file=${encodeURIComponent(pdfPath)}`);
+                const apiBaseUrl = getApiUrl();
+                setPdfUrl(`${apiBaseUrl}/api/pos/${decodedPoNumber}/pdf?file=${encodeURIComponent(pdfPath)}`);
               }
             }
             setLoading(false);
@@ -85,7 +87,8 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
               setPdfUrl(pdfPath);
             } else {
               // Try to construct API URL even for mock
-              setPdfUrl(`http://localhost:4000/api/pos/${decodedPoNumber}/pdf?file=${encodeURIComponent(pdfPath)}`);
+              const apiBaseUrl = getApiUrl();
+              setPdfUrl(`${apiBaseUrl}/api/pos/${decodedPoNumber}/pdf?file=${encodeURIComponent(pdfPath)}`);
             }
           }
         } else {
@@ -228,7 +231,7 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
 
       // Only try to save if not using mock data
       if (!usingMock) {
-        const res = await fetch(`http://localhost:4000/api/pos/${po.PONumber}`, {
+        const res = await fetch(getApiEndpoint(`/api/pos/${po.PONumber}`), {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
