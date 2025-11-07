@@ -8,6 +8,9 @@ interface ItemCardProps {
   totalItems: number;
   onToggleIncomplete: (index: number) => void;
   onUpdateItem: (index: number, item: POItem) => void;
+  isNewItem?: boolean;
+  onSaveNewItem?: () => void;
+  onCancelNewItem?: () => void;
 }
 
 export default function ItemCard({
@@ -16,31 +19,40 @@ export default function ItemCard({
   totalItems,
   onToggleIncomplete,
   onUpdateItem,
+  isNewItem = false,
+  onSaveNewItem,
+  onCancelNewItem,
 }: ItemCardProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 space-y-4">
+    <div className={`bg-white rounded-lg shadow-sm p-6 space-y-4 ${isNewItem ? "border-2 border-green-400" : "border border-gray-200"}`}>
       <div className="flex items-center justify-between mb-4 pb-4 border-b">
         <h3 className="text-lg font-semibold text-gray-900">
-          Item {index + 1} of {totalItems}
+          {isNewItem ? (
+            <span className="text-green-600">New Item (Position {index + 1} of {totalItems})</span>
+          ) : (
+            <>Item {index + 1} of {totalItems}</>
+          )}
         </h3>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-sm font-medium text-gray-700">Mark as Incomplete</span>
-            <button
-              onClick={() => onToggleIncomplete(index)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                item.IsIncomplete ? "bg-red-500" : "bg-gray-300"
-              }`}
-              role="switch"
-              aria-checked={item.IsIncomplete}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  item.IsIncomplete ? "translate-x-6" : "translate-x-1"
+          {!isNewItem && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <span className="text-sm font-medium text-gray-700">Mark as Incomplete</span>
+              <button
+                onClick={() => onToggleIncomplete(index)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  item.IsIncomplete ? "bg-red-500" : "bg-gray-300"
                 }`}
-              />
-            </button>
-          </label>
+                role="switch"
+                aria-checked={item.IsIncomplete}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    item.IsIncomplete ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </label>
+          )}
         </div>
       </div>
 
@@ -268,11 +280,28 @@ export default function ItemCard({
         </div>
       </div>
 
-      {item.IsIncomplete && (
+      {item.IsIncomplete && !isNewItem && (
         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
           <p className="text-sm text-red-800 font-medium">
             ⚠️ This item is marked as incomplete
           </p>
+        </div>
+      )}
+
+      {isNewItem && (
+        <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-end gap-3">
+          <button
+            onClick={onCancelNewItem}
+            className="px-4 py-2 rounded-md border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSaveNewItem}
+            className="px-6 py-2 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
+          >
+            Save Item
+          </button>
         </div>
       )}
     </div>

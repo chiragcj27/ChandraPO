@@ -36,6 +36,7 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
   const [saving, setSaving] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [usingMock, setUsingMock] = useState(false);
+  const [isAddingNewItem, setIsAddingNewItem] = useState(false);
 
   useEffect(() => {
     const fetchPO = async () => {
@@ -113,6 +114,53 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
     const updatedItems = [...items];
     updatedItems[index] = item;
     setItems(updatedItems);
+  };
+
+  const createBlankItem = (): POItem => {
+    return {
+      IsIncomplete: false,
+      ClientItemCode: "",
+      ChandraItemCode: "",
+      JobBagNumber: "",
+      Description: "",
+      Quantity: 0,
+      MetalType: "",
+      MetalColor: "",
+      Category: "",
+      Remarks: "",
+      StampingInstructions: "",
+      StampRequired: false,
+      InvoiceNumber: "",
+    };
+  };
+
+  const handleAddItem = () => {
+    const blankItem = createBlankItem();
+    const updatedItems = [...items];
+    // Insert the new item just before the current item (at currentIndex)
+    updatedItems.splice(currentIndex, 0, blankItem);
+    setItems(updatedItems);
+    setIsAddingNewItem(true);
+    // The currentIndex stays the same, which now points to the new blank item
+  };
+
+  const handleSaveNewItem = () => {
+    setIsAddingNewItem(false);
+    // Item is already in the items array, just exit add mode
+  };
+
+  const handleCancelNewItem = () => {
+    const updatedItems = [...items];
+    // Remove the item at currentIndex (the temporary new item)
+    updatedItems.splice(currentIndex, 1);
+    setItems(updatedItems);
+    setIsAddingNewItem(false);
+    // Adjust currentIndex if we removed the last item
+    if (currentIndex >= updatedItems.length && updatedItems.length > 0) {
+      setCurrentIndex(updatedItems.length - 1);
+    } else if (updatedItems.length === 0) {
+      setCurrentIndex(0);
+    }
   };
 
   const handlePrevious = () => {
@@ -301,6 +349,9 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
                 totalItems={items.length}
                 onToggleIncomplete={handleToggleIncomplete}
                 onUpdateItem={handleUpdateItem}
+                isNewItem={isAddingNewItem}
+                onSaveNewItem={handleSaveNewItem}
+                onCancelNewItem={handleCancelNewItem}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">
@@ -317,9 +368,9 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
             <div className="flex items-center justify-between">
               <button
                 onClick={handlePrevious}
-                disabled={currentIndex === 0}
+                disabled={currentIndex === 0 || isAddingNewItem}
                 className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  currentIndex === 0
+                  currentIndex === 0 || isAddingNewItem
                     ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                     : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                 }`}
@@ -328,25 +379,35 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
               </button>
 
               <div className="flex items-center gap-3">
-                {hasIncomplete && (
+                {!isAddingNewItem && (
+                  <button
+                    onClick={handleAddItem}
+                    className="px-4 py-2 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
+                  >
+                    + Add Item
+                  </button>
+                )}
+                {hasIncomplete && !isAddingNewItem && (
                   <span className="text-sm text-red-600 font-medium">
                     ⚠️ {incompleteCount} incomplete item(s)
                   </span>
                 )}
-                <button
-                  onClick={handleFinishReview}
-                  disabled={saving}
-                  className="px-6 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {saving ? "Saving..." : "Finish Review"}
-                </button>
+                {!isAddingNewItem && (
+                  <button
+                    onClick={handleFinishReview}
+                    disabled={saving}
+                    className="px-6 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {saving ? "Saving..." : "Finish Review"}
+                  </button>
+                )}
               </div>
 
               <button
                 onClick={handleNext}
-                disabled={currentIndex === items.length - 1}
+                disabled={currentIndex === items.length - 1 || isAddingNewItem}
                 className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  currentIndex === items.length - 1
+                  currentIndex === items.length - 1 || isAddingNewItem
                     ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                     : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                 }`}
