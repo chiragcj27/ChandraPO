@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ValueFormatterParams, ICellRendererParams } from "ag-grid-community";
 import type { PurchaseOrder } from "../types/po";
@@ -16,17 +16,20 @@ export default function DashboardPage() {
   const [rowData, setRowData] = useState<PurchaseOrder[]>([]);
   const router = useRouter();
 
-  const ActionCellRenderer = (params: ICellRendererParams<PurchaseOrder, string>) => {
-    const poNumber = params.data?.PONumber;
-    const onClick = () => {
-      if (poNumber) router.push(`/review/${encodeURIComponent(poNumber)}`);
-    };
-    return (
-      <button onClick={onClick} className="px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100">
-        Review
-      </button>
-    );
-  };
+  const ActionCellRenderer = useCallback(
+    (params: ICellRendererParams<PurchaseOrder, string>) => {
+      const poNumber = params.data?.PONumber;
+      const onClick = () => {
+        if (poNumber) router.push(`/review/${encodeURIComponent(poNumber)}`);
+      };
+      return (
+        <button onClick={onClick} className="px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100">
+          Review
+        </button>
+      );
+    },
+    [router],
+  );
 
   const columnDefs = useMemo<ColDef<PurchaseOrder>[]>(
     () => [
@@ -40,16 +43,20 @@ export default function DashboardPage() {
       { headerName: "Reminder Count", field: "ClientReminderCount", sortable: true },
       { headerName: "Action", field: "PONumber", sortable: false, filter: false, width: 120, cellRenderer: ActionCellRenderer },
     ],
-    []
+    [ActionCellRenderer]
   );
 
   const onUploadClick = () => fileInputRef.current?.click();
 
   const loadPOs = async () => {
     try {
-      const res = await fetch(getApiEndpoint("/api/pos"));
-      const data: PurchaseOrder[] = await res.json();
-      setRowData(data);
+      const res = await fetch(getApiEndpoint("/po"));
+      if (!res.ok) {
+        throw new Error("Failed to load purchase orders");
+      }
+      const payload = await res.json();
+      const data: PurchaseOrder[] = Array.isArray(payload) ? payload : payload?.data || [];
+      setRowData(Array.isArray(data) ? data : []);
     } catch {
       // noop for now
     }
@@ -65,7 +72,7 @@ export default function DashboardPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(getApiEndpoint("/api/pos/upload"), {
+      const res = await fetch(getApiEndpoint("/po/upload"), {
         method: "POST",
         body: form,
       });
@@ -92,7 +99,7 @@ export default function DashboardPage() {
             className="hidden"
           />
           <button onClick={onUploadClick} className="px-3 py-2 rounded border border-gray-300 bg-black text-white">
-            Upload PO (PDF)
+            Add PO
           </button>
         </div>
       </header>

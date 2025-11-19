@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PurchaseOrder, POItem } from "@/types/po";
 import ItemCard from "../components/ItemCard";
-import { getApiEndpoint, getApiUrl } from "@/lib/api";
+import { getApiEndpoint } from "@/lib/api";
 
 // Mock data for fallback
 async function getMockPO(poNumber: string): Promise<PurchaseOrder | null> {
@@ -46,7 +46,7 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
         
         // Try to fetch from API first
         try {
-          const res = await fetch(getApiEndpoint(`/api/pos/${decodedPoNumber}`));
+          const res = await fetch(getApiEndpoint(`/po/${decodedPoNumber}`));
           if (res.ok) {
             const data: PurchaseOrder = await res.json();
             setPo(data);
@@ -55,15 +55,11 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
             
             // Set PDF URL - prefer uploads path, otherwise use first available
             if (data.PO && data.PO.length > 0) {
-              // Find uploads path first, or use the first one
               const pdfPath = data.PO.find((p: string) => p.includes("uploads/")) || data.PO[0];
-              // Check if it's already a URL or a relative path
               if (pdfPath.startsWith("http")) {
                 setPdfUrl(pdfPath);
               } else {
-                // Assume it's a relative path, construct the API URL
-                const apiBaseUrl = getApiUrl();
-                setPdfUrl(`${apiBaseUrl}/api/pos/${decodedPoNumber}/pdf?file=${encodeURIComponent(pdfPath)}`);
+                setPdfUrl(getApiEndpoint(`/po/${decodedPoNumber}/pdf?file=${encodeURIComponent(pdfPath)}`));
               }
             }
             setLoading(false);
@@ -86,9 +82,7 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
             if (pdfPath.startsWith("http")) {
               setPdfUrl(pdfPath);
             } else {
-              // Try to construct API URL even for mock
-              const apiBaseUrl = getApiUrl();
-              setPdfUrl(`${apiBaseUrl}/api/pos/${decodedPoNumber}/pdf?file=${encodeURIComponent(pdfPath)}`);
+              setPdfUrl(getApiEndpoint(`/po/${decodedPoNumber}/pdf?file=${encodeURIComponent(pdfPath)}`));
             }
           }
         } else {
@@ -231,7 +225,7 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
 
       // Only try to save if not using mock data
       if (!usingMock) {
-        const res = await fetch(getApiEndpoint(`/api/pos/${po.PONumber}`), {
+        const res = await fetch(getApiEndpoint(`/po/${po.PONumber}`), {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
