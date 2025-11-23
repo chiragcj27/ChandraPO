@@ -14,6 +14,7 @@ import "ag-grid-community/styles/ag-theme-quartz.css";
 export default function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [rowData, setRowData] = useState<PurchaseOrder[]>([]);
+  const [uploading, setUploading] = useState(false);
   const router = useRouter();
 
   const ActionCellRenderer = useCallback(
@@ -69,6 +70,8 @@ export default function DashboardPage() {
   const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    setUploading(true);
     try {
       const form = new FormData();
       form.append("file", file);
@@ -76,12 +79,29 @@ export default function DashboardPage() {
         method: "POST",
         body: form,
       });
-      if (!res.ok) throw new Error("Upload failed");
-      await loadPOs();
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(errorData.message || errorData.error || "Upload failed");
+      }
+      
+      const result = await res.json();
+      const poNumber = result.po?.PONumber || result.poNumber;
+      
+      if (poNumber) {
+        // Navigate to review page with the extracted PO data
+        router.push(`/review/${encodeURIComponent(poNumber)}`);
+      } else {
+        // Fallback: reload the list if PO number is not available
+        await loadPOs();
+        alert("PO uploaded successfully");
+      }
     } catch (err) {
-      console.error(err);
-      alert("Upload failed");
+      console.error("Upload error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Upload failed. Please try again.";
+      alert(errorMessage);
     } finally {
+      setUploading(false);
       e.target.value = "";
     }
   };
@@ -98,8 +118,12 @@ export default function DashboardPage() {
             onChange={handleFileChange}
             className="hidden"
           />
-          <button onClick={onUploadClick} className="px-3 py-2 rounded border border-gray-300 bg-black text-white">
-            Add PO
+          <button 
+            onClick={onUploadClick} 
+            disabled={uploading}
+            className="px-3 py-2 rounded border border-gray-300 bg-black text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {uploading ? "Uploading..." : "Add PO"}
           </button>
         </div>
       </header>
