@@ -25,6 +25,10 @@ app.add_middleware(
 PROMPT = """
 Extract all invoice/PO items in structured JSON.
 
+IMPORTANT: This Purchase Order is FROM a client TO Chandra Jewels Pvt Limited.
+The client_name should be the sender/buyer (the client who is placing the order), NOT Chandra Jewels.
+Chandra Jewels is the recipient/vendor, not the client.
+
 Item fields:
 - StyleCode
 - Category
@@ -43,7 +47,7 @@ Item fields:
 
 Global fields:
 - total_value
-- client_name
+- client_name (MUST be the buyer/client name, NOT Chandra Jewels)
 - invoice_number
 - total_entries
 - invoice_date
@@ -71,8 +75,11 @@ async def extract_invoice(file: UploadFile = File(...)):
         json_text = match.group(0) if match else raw
 
         data = json.loads(json_text)
-        data.setdefault("lines", [])
-        data.setdefault("total_entries", len(data["lines"]))
+        # Ensure items array exists (rename lines to items if present)
+        if "lines" in data and "items" not in data:
+            data["items"] = data.pop("lines")
+        data.setdefault("items", [])
+        data.setdefault("total_entries", len(data["items"]))
 
         return JSONResponse(content=data)
 

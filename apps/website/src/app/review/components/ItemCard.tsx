@@ -59,13 +59,41 @@ export default function ItemCard({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Client Item Code
+            Style Code
           </label>
           <input
             type="text"
-            value={item.ClientItemCode}
+            value={item.StyleCode || ""}
             onChange={(e) =>
-              onUpdateItem(index, { ...item, ClientItemCode: e.target.value })
+              onUpdateItem(index, { ...item, StyleCode: e.target.value })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Item Ref No
+          </label>
+          <input
+            type="text"
+            value={item.ItemRefNo || ""}
+            onChange={(e) =>
+              onUpdateItem(index, { ...item, ItemRefNo: e.target.value })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Item PO No
+          </label>
+          <input
+            type="text"
+            value={item.ItemPoNo || ""}
+            onChange={(e) =>
+              onUpdateItem(index, { ...item, ItemPoNo: e.target.value })
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -87,55 +115,13 @@ export default function ItemCard({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Job Bag Number
-          </label>
-          <input
-            type="text"
-            value={item.JobBagNumber}
-            onChange={(e) =>
-              onUpdateItem(index, { ...item, JobBagNumber: e.target.value })
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Quantity
+            Order Quantity
           </label>
           <input
             type="number"
-            value={item.Quantity}
+            value={item.OrderQty || 0}
             onChange={(e) =>
-              onUpdateItem(index, { ...item, Quantity: parseInt(e.target.value) || 0 })
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Description
-          </label>
-          <textarea
-            value={item.Description}
-            onChange={(e) =>
-              onUpdateItem(index, { ...item, Description: e.target.value })
-            }
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Metal Type
-          </label>
-          <input
-            type="text"
-            value={item.MetalType}
-            onChange={(e) =>
-              onUpdateItem(index, { ...item, MetalType: e.target.value })
+              onUpdateItem(index, { ...item, OrderQty: parseInt(e.target.value) || 0 })
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -143,13 +129,27 @@ export default function ItemCard({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Metal Color
+            Metal
           </label>
           <input
             type="text"
-            value={item.MetalColor}
+            value={item.Metal || ""}
             onChange={(e) =>
-              onUpdateItem(index, { ...item, MetalColor: e.target.value })
+              onUpdateItem(index, { ...item, Metal: e.target.value })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tone
+          </label>
+          <input
+            type="text"
+            value={item.Tone || ""}
+            onChange={(e) =>
+              onUpdateItem(index, { ...item, Tone: e.target.value })
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -161,7 +161,7 @@ export default function ItemCard({
           </label>
           <input
             type="text"
-            value={item.Category}
+            value={item.Category || ""}
             onChange={(e) =>
               onUpdateItem(index, { ...item, Category: e.target.value })
             }
@@ -171,56 +171,100 @@ export default function ItemCard({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Size
+            Item Size
           </label>
           <input
             type="text"
-            value={item.Size || item.size || ""}
+            value={item.ItemSize || ""}
             onChange={(e) =>
-              onUpdateItem(index, { ...item, Size: e.target.value, size: e.target.value })
+              onUpdateItem(index, { ...item, ItemSize: e.target.value || null })
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
-        <div className="col-span-2">
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Remarks
+            Stock Type
           </label>
-          <textarea
-            value={item.Remarks || ""}
-            onChange={(e) =>
-              onUpdateItem(index, { ...item, Remarks: e.target.value })
-            }
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Stamping Instructions
-          </label>
-          <textarea
-            value={item.StampingInstructions || ""}
-            onChange={(e) =>
-              onUpdateItem(index, { ...item, StampingInstructions: e.target.value })
-            }
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
           <input
-            type="checkbox"
-            checked={item.StampRequired}
+            type="text"
+            value={item.StockType || ""}
             onChange={(e) =>
-              onUpdateItem(index, { ...item, StampRequired: e.target.checked })
+              onUpdateItem(index, { ...item, StockType: e.target.value || null })
             }
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <label className="text-sm font-medium text-gray-700">Stamp Required</label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Make Type
+          </label>
+          <input
+            type="text"
+            value={item.MakeType || ""}
+            onChange={(e) =>
+              onUpdateItem(index, { ...item, MakeType: e.target.value || null })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Customer Production Instruction
+          </label>
+          <textarea
+            value={item.CustomerProductionInstruction || ""}
+            onChange={(e) =>
+              onUpdateItem(index, { ...item, CustomerProductionInstruction: e.target.value || null })
+            }
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Special Remarks
+          </label>
+          <textarea
+            value={item.SpecialRemarks || ""}
+            onChange={(e) =>
+              onUpdateItem(index, { ...item, SpecialRemarks: e.target.value || null })
+            }
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Design Production Instruction
+          </label>
+          <textarea
+            value={item.DesignProductionInstruction || ""}
+            onChange={(e) =>
+              onUpdateItem(index, { ...item, DesignProductionInstruction: e.target.value || null })
+            }
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Stamp Instruction
+          </label>
+          <textarea
+            value={item.StampInstruction || ""}
+            onChange={(e) =>
+              onUpdateItem(index, { ...item, StampInstruction: e.target.value || null })
+            }
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
         <div>

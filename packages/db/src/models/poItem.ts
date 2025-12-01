@@ -2,41 +2,54 @@ import mongoose from "mongoose";
 
 export interface POItemInterface {
     isIncomplete: boolean;
-    clientItemCode: string;
+    styleCode: string;
+    itemRefNo: string;
+    itemPoNo: string;
     chandraItemCode: string;
-    jobBagNumber: string;
-    description: string;
-    quantity: number;
-    metalType: string;
-    metalColor: string;
+    orderQty: number;
+    metal: string;
+    tone: string;
     category: string;
-    remarks: string;
-    size?: string;
-    stampingInstructions: string;
-    stampRequired: boolean;
-    deadlineDate?: Date;
-    shippingDate?: Date;
+    stockType?: string | null;
+    makeType?: string | null;
+    customerProductionInstruction?: string | null;
+    specialRemarks?: string | null;
+    designProductionInstruction?: string | null;
+    stampInstruction?: string | null;
+    itemSize?: string | null;
+    deadlineDate?: Date | null;
+    shippingDate?: Date | null;
     invoiceNumber: string;
 }
 
 export const poItemSchema = new mongoose.Schema<POItemInterface>({
-    isIncomplete: { type: Boolean, required: true },
-    clientItemCode: { type: String, required: true },
+    isIncomplete: { type: Boolean, required: true, default: true },
+    styleCode: { type: String, required: true, default: "" },
+    itemRefNo: { type: String, required: true, default: "" },
+    itemPoNo: { type: String, required: true, default: "" },
     chandraItemCode: { type: String, default: "" },
-    jobBagNumber: { type: String, default: "" },
-    description: { type: String, default: "" },
-    quantity: { type: Number, default: 0 },
-    metalType: { type: String, default: "" },
-    metalColor: { type: String, default: "" },
-    category: { type: String, default: "" },
-    remarks: { type: String, default: "" },
-    size: { type: String, required: false },
-    stampingInstructions: { type: String, default: "" },
-    stampRequired: { type: Boolean, default: false },
+    orderQty: { type: Number, required: true, default: 0 },
+    metal: { type: String, required: true, default: "" },
+    tone: { type: String, required: true, default: "" },
+    category: { type: String, required: true, default: "" },
+    stockType: { type: String, default: null },
+    makeType: { type: String, default: null },
+    customerProductionInstruction: { type: String, default: null },
+    specialRemarks: { type: String, default: null },
+    designProductionInstruction: { type: String, default: null },
+    stampInstruction: { type: String, default: null },
+    itemSize: { type: String, default: null },
     deadlineDate: { type: Date, default: null },
     shippingDate: { type: Date, default: null },
-    invoiceNumber: { type: String, default: "" },
+    invoiceNumber: { type: String, required: true, default: "" },
+}, {
+    timestamps: true,
 })
+
+// Delete existing model if it exists to avoid schema conflicts
+if (mongoose.models.POItem) {
+  delete mongoose.models.POItem;
+}
 
 const POItem = mongoose.model<POItemInterface>("POItem", poItemSchema) as mongoose.Model<POItemInterface>;
 

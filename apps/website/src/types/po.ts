@@ -2,21 +2,23 @@ export type POStatus = 'New' | 'In Review' | 'Reviewed' | 'Reviewed & Incomplete
 
 export interface POItem {
   IsIncomplete: boolean;
-  ClientItemCode: string;
+  StyleCode: string;
+  ItemRefNo: string;
+  ItemPoNo: string;
   ChandraItemCode: string;
-  JobBagNumber: string;
-  Description: string;
-  Quantity: number;
-  MetalType: string;
-  MetalColor: string;
+  OrderQty: number;
+  Metal: string;
+  Tone: string;
   Category: string;
-  Remarks: string;
-  Size?: string;
-  size?: string; // Allow both for compatibility
-  StampingInstructions: string;
-  StampRequired: boolean;
-  DeadlineDate?: Date | string;
-  ShippingDate?: Date | string;
+  StockType?: string | null;
+  MakeType?: string | null;
+  CustomerProductionInstruction?: string | null;
+  SpecialRemarks?: string | null;
+  DesignProductionInstruction?: string | null;
+  StampInstruction?: string | null;
+  ItemSize?: string | null;
+  DeadlineDate?: Date | string | null;
+  ShippingDate?: Date | string | null;
   InvoiceNumber: string;
 }
 
