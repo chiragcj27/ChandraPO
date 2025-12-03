@@ -3,10 +3,9 @@ import path from 'path';
 
 export interface POItem {
   IsIncomplete: boolean;
-  StyleCode: string;
+  VendorStyleCode: string;
   ItemRefNo: string;
   ItemPoNo: string;
-  ChandraItemCode: string;
   OrderQty: number;
   Metal: string;
   Tone: string;

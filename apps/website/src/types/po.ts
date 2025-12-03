@@ -2,10 +2,9 @@ export type POStatus = 'New' | 'In Review' | 'Reviewed' | 'Reviewed & Incomplete
 
 export interface POItem {
   IsIncomplete: boolean;
-  StyleCode: string;
+  VendorStyleCode: string;
   ItemRefNo: string;
   ItemPoNo: string;
-  ChandraItemCode: string;
   OrderQty: number;
   Metal: string;
   Tone: string;

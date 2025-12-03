@@ -59,13 +59,13 @@ export default function ItemCard({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Style Code
+            Vendor Style Code
           </label>
           <input
             type="text"
-            value={item.StyleCode || ""}
+            value={item.VendorStyleCode || ""}
             onChange={(e) =>
-              onUpdateItem(index, { ...item, StyleCode: e.target.value })
+              onUpdateItem(index, { ...item, VendorStyleCode: e.target.value })
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -101,20 +101,6 @@ export default function ItemCard({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Chandra Item Code
-          </label>
-          <input
-            type="text"
-            value={item.ChandraItemCode || ""}
-            onChange={(e) =>
-              onUpdateItem(index, { ...item, ChandraItemCode: e.target.value })
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
             Order Quantity
           </label>
           <input
@@ -131,14 +117,21 @@ export default function ItemCard({
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Metal
           </label>
-          <input
-            type="text"
+          <select
             value={item.Metal || ""}
             onChange={(e) =>
               onUpdateItem(index, { ...item, Metal: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select metal</option>
+            <option value="G09KT">G09KT</option>
+            <option value="G10KT">G10KT</option>
+            <option value="G14KT">G14KT</option>
+            <option value="G18KT">G18KT</option>
+            <option value="950">950</option>
+            <option value="SV925">SV925</option>
+          </select>
         </div>
 
         <div>
@@ -187,28 +180,46 @@ export default function ItemCard({
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Stock Type
           </label>
-          <input
-            type="text"
+          <select
             value={item.StockType || ""}
             onChange={(e) =>
               onUpdateItem(index, { ...item, StockType: e.target.value || null })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select stock type</option>
+            <option value="Studded Gold Jewellery IC">Studded Gold Jewellery IC</option>
+            <option value="Studded Platinum Jewellery IC">Studded Platinum Jewellery IC</option>
+            <option value="Plain Gold Jewellery IC">Plain Gold Jewellery IC</option>
+            <option value="Plain Platinum Jewellery IC">Plain Platinum Jewellery IC</option>
+            <option value="Studded Semi Mount Gold Jewellery IC">Studded Semi Mount Gold Jewellery IC</option>
+            <option value="Studded Silver Jewellery IC">Studded Silver Jewellery IC</option>
+            <option value="Plain Silver Jewellery IC">Plain Silver Jewellery IC</option>
+            <option value="Studded Semi Mount Platinum Jewellery IC">Studded Semi Mount Platinum Jewellery IC</option>
+            <option value="Gold Mount Jewellery IC">Gold Mount Jewellery IC</option>
+            <option value="Studded Combination Jewellery IC">Studded Combination Jewellery IC</option>
+          </select>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Make Type
           </label>
-          <input
-            type="text"
+          <select
             value={item.MakeType || ""}
             onChange={(e) =>
               onUpdateItem(index, { ...item, MakeType: e.target.value || null })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select make type</option>
+            <option value="CNC">CNC</option>
+            <option value="HOLLOW TUBING">HOLLOW TUBING</option>
+            <option value="1 PC CAST">1 PC CAST</option>
+            <option value="2 PC CAST">2 PC CAST</option>
+            <option value="MULTI CAST">MULTI CAST</option>
+            <option value="HIP HOP">HIP HOP</option>
+          </select>
         </div>
 
         <div className="col-span-2">

@@ -13,5 +13,6 @@ router.get('/', poController.getPOs);
 router.get('/:poNumber/pdf', poController.streamPOPdf);
 router.get('/:poNumber', poController.getPOByNumber);
 router.put('/:poNumber', poController.updatePO);
+router.delete('/:poNumber', poController.deletePO);
 
 export default router;

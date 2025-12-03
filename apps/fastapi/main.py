@@ -29,15 +29,21 @@ IMPORTANT: This Purchase Order is FROM a client TO Chandra Jewels Pvt Limited.
 The client_name should be the sender/buyer (the client who is placing the order), NOT Chandra Jewels.
 Chandra Jewels is the recipient/vendor, not the client.
 
+VENDOR INFORMATION:
+- The vendor is Chandra Jewels
+- For all items, there will be two codes:
+  1. VendorStyleCode: This is the vendor's (Chandra Jewels) style code
+  2. ItemRefNo: This is the client's item reference number
+
 Item fields:
-- StyleCode
+- VendorStyleCode (vendor's style code from Chandra Jewels)
 - Category
 - ItemSize
 - OrderQty
 - Metal
 - Tone
 - ItemPoNo
-- ItemRefNo
+- ItemRefNo (client's item reference number)
 - StockType
 - MakeType
 - CustomerProductionInstruction

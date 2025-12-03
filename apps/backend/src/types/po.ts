@@ -1,6 +1,6 @@
 // FastAPI Response Types
 export interface ExtractedLine {
-  StyleCode: string;
+  VendorStyleCode: string;
   Category: string;
   ItemSize?: string | null;
   OrderQty: number;
@@ -28,10 +28,9 @@ export interface ExtractedPOResponse {
 // Database/API Types
 export interface PurchaseOrderItem {
   IsIncomplete: boolean;
-  StyleCode: string;
+  VendorStyleCode: string;
   ItemRefNo: string;
   ItemPoNo: string;
-  ChandraItemCode: string;
   OrderQty: number;
   Metal: string;
   Tone: string;
@@ -74,10 +73,9 @@ export interface FileMetadata {
 // Internal types for database operations
 export interface POItemRecord {
   isIncomplete: boolean;
-  styleCode: string;
+  vendorStyleCode: string;
   itemRefNo: string;
   itemPoNo: string;
-  chandraItemCode: string;
   orderQty: number;
   metal: string;
   tone: string;
@@ -112,10 +110,9 @@ export interface PODocumentShape {
 // DTO types for API responses
 export interface PurchaseOrderItemDTO {
   IsIncomplete: boolean;
-  StyleCode: string;
+  VendorStyleCode: string;
   ItemRefNo: string;
   ItemPoNo: string;
-  ChandraItemCode: string;
   OrderQty: number;
   Metal: string;
   Tone: string;

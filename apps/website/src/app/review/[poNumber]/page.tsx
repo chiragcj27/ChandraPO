@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PurchaseOrder, POItem } from "@/types/po";
 import ItemCard from "../components/ItemCard";
+import EmailDialog from "../components/EmailDialog";
 import { getApiEndpoint } from "@/lib/api";
 
 // Mock data for fallback
@@ -39,6 +40,10 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
   const [usingMock, setUsingMock] = useState(false);
   const [isAddingNewItem, setIsAddingNewItem] = useState(false);
   const [hasExportedOnce, setHasExportedOnce] = useState(false);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [emailContent, setEmailContent] = useState<string>("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const fetchPO = async () => {
@@ -113,10 +118,9 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
   const createBlankItem = (): POItem => {
     return {
       IsIncomplete: true,
-      StyleCode: "",
+      VendorStyleCode: "",
       ItemRefNo: "",
       ItemPoNo: "",
-      ChandraItemCode: "",
       OrderQty: 0,
       Metal: "",
       Tone: "",
@@ -194,10 +198,9 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
       };
 
       return {
-        StyleCode: item.StyleCode ?? "",
+        VendorStyleCode: item.VendorStyleCode ?? "",
         ItemRefNo: item.ItemRefNo ?? "",
         ItemPoNo: item.ItemPoNo ?? "",
-        ChandraItemCode: item.ChandraItemCode ?? "",
         OrderQty: item.OrderQty ?? 0,
         Metal: item.Metal ?? "",
         Tone: item.Tone ?? "",
@@ -225,6 +228,103 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
     setHasExportedOnce(true);
   };
 
+  const generateEmailContent = (): string => {
+    if (!po || !items.length) return "";
+
+    const incompleteItems = items.filter((item) => item.IsIncomplete);
+    if (incompleteItems.length === 0) {
+      return "All items are complete. No email needed.";
+    }
+
+    // Field labels mapping - only include important fields
+    const fieldChecks: Array<{ key: keyof POItem; label: string }> = [
+      { key: "VendorStyleCode", label: "Vendor Style Code" },
+      { key: "ItemRefNo", label: "Item Ref No" },
+      { key: "Metal", label: "Metal" },
+      { key: "Tone", label: "Tone" },
+      { key: "Category", label: "Category" },
+      { key: "OrderQty", label: "Order Quantity" },
+      { key: "StockType", label: "Stock Type" },
+      { key: "MakeType", label: "Make Type" },
+      { key: "ItemSize", label: "Item Size" },
+      { key: "DeadlineDate", label: "Deadline Date" },
+      { key: "ShippingDate", label: "Shipping Date" },
+      { key: "CustomerProductionInstruction", label: "Customer Production Instruction" },
+      { key: "SpecialRemarks", label: "Special Remarks" },
+      { key: "DesignProductionInstruction", label: "Design Production Instruction" },
+      { key: "StampInstruction", label: "Stamp Instruction" },
+    ];
+
+    // Helper function to check if a field is missing/empty
+    const isFieldMissing = (item: POItem, field: keyof POItem): boolean => {
+      const value = item[field];
+      if (value === null || value === undefined) return true;
+      if (typeof value === "string" && value.trim() === "") return true;
+      return false;
+    };
+
+    // Build email content - short and precise
+    let email = `Subject: Missing Details for PO ${po.PONumber}\n\n`;
+    email += `Dear ${po.ClientName},\n\n`;
+    email += `Please provide the following missing information for PO ${po.PONumber}:\n\n`;
+
+    incompleteItems.forEach((item, index) => {
+      const missingFields: string[] = [];
+      
+      fieldChecks.forEach(({ key, label }) => {
+        if (isFieldMissing(item, key)) {
+          missingFields.push(label);
+        }
+      });
+
+      if (missingFields.length > 0) {
+        // Use item identifier or index
+        const identifier = item.VendorStyleCode || item.ItemRefNo || item.ItemPoNo || `Item ${index + 1}`;
+        email += `${index + 1}. ${identifier}\n`;
+        email += `   Missing: ${missingFields.join(", ")}\n\n`;
+      }
+    });
+
+    email += `Please respond at your earliest convenience.\n\nThank you.`;
+
+    return email;
+  };
+
+  const handleGenerateEmail = () => {
+    const content = generateEmailContent();
+    setEmailContent(content);
+    setIsEmailDialogOpen(true);
+  };
+
+  const handleDeletePO = async () => {
+    if (!po || usingMock) {
+      alert("Cannot delete PO in mock mode");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch(getApiEndpoint(`/po/${po.PONumber}`), {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Delete failed" }));
+        throw new Error(errorData.message || errorData.error || "Failed to delete PO");
+      }
+
+      // Navigate back to dashboard after successful deletion
+      router.push("/");
+    } catch (error) {
+      console.error("Error deleting PO:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete PO. Please try again.";
+      alert(errorMessage);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const handleFinishReview = async () => {
     if (!po) return;
 
@@ -235,10 +335,9 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
       const normalizedItems = items.map((item) => {
         const normalized = {
           IsIncomplete: item.IsIncomplete,
-          StyleCode: item.StyleCode,
+          VendorStyleCode: item.VendorStyleCode,
           ItemRefNo: item.ItemRefNo,
           ItemPoNo: item.ItemPoNo,
-          ChandraItemCode: item.ChandraItemCode,
           OrderQty: item.OrderQty,
           Metal: item.Metal,
           Tone: item.Tone,
@@ -353,12 +452,34 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
             {po.ClientName} • {items.length} items • {incompleteCount} incomplete
           </p>
         </div>
-        <Link
-          href="/"
-          className="px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 font-medium transition-colors"
-        >
-          Back to Dashboard
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleGenerateEmail}
+            disabled={!hasIncomplete || items.length === 0}
+            className={`px-4 py-2 rounded-md border font-medium transition-colors ${
+              !hasIncomplete || items.length === 0
+                ? "border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "border-blue-300 bg-white hover:bg-blue-50 text-blue-700"
+            }`}
+          >
+            Generate Email Content
+          </button>
+          {!usingMock && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="px-4 py-2 rounded-md border border-red-300 bg-white hover:bg-red-50 text-red-700 font-medium transition-colors disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? "Deleting..." : "Delete PO"}
+            </button>
+          )}
+          <Link
+            href="/"
+            className="px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 font-medium transition-colors"
+          >
+            Back to Dashboard
+          </Link>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -492,6 +613,46 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
           </div>
         </div>
       </div>
+      
+      <EmailDialog
+        isOpen={isEmailDialogOpen}
+        onClose={() => setIsEmailDialogOpen(false)}
+        emailContent={emailContent}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Delete Purchase Order</h2>
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to delete PO <strong>{po?.PONumber}</strong>? This action cannot be undone and will delete:
+              <ul className="list-disc list-inside mt-2 text-sm text-gray-600">
+                <li>The PO from the database</li>
+                <li>All associated items</li>
+                <li>All files from S3</li>
+                <li>All file metadata</li>
+              </ul>
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeletePO}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-md bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

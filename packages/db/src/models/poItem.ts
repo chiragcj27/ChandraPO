@@ -2,10 +2,9 @@ import mongoose from "mongoose";
 
 export interface POItemInterface {
     isIncomplete: boolean;
-    styleCode: string;
+    vendorStyleCode: string;
     itemRefNo: string;
     itemPoNo: string;
-    chandraItemCode: string;
     orderQty: number;
     metal: string;
     tone: string;
@@ -24,10 +23,9 @@ export interface POItemInterface {
 
 export const poItemSchema = new mongoose.Schema<POItemInterface>({
     isIncomplete: { type: Boolean, required: true, default: true },
-    styleCode: { type: String, required: true, default: "" },
+    vendorStyleCode: { type: String, required: true, default: "" },
     itemRefNo: { type: String, required: true, default: "" },
     itemPoNo: { type: String, required: true, default: "" },
-    chandraItemCode: { type: String, default: "" },
     orderQty: { type: Number, required: true, default: 0 },
     metal: { type: String, required: true, default: "" },
     tone: { type: String, required: true, default: "" },
