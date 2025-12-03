@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --card-bg: #ffffff;
+  --border: #e2e8f0;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-lg: rgba(0, 0, 0, 0.15);
 }
 
 @theme inline {
@@ -12,9 +21,83 @@
   --font-mono: var(--font-geist-mono);
 }
 
+* {
+  transition-property: color, background-color, border-color, opacity, transform, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* AG Grid customizations */
+.ag-theme-quartz {
+  --ag-font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --ag-font-size: 14px;
+  --ag-header-foreground-color: #0f172a;
+  --ag-header-background-color: #f8fafc;
+  --ag-header-cell-hover-background-color: #f1f5f9;
+  --ag-row-hover-color: #f8fafc;
+  --ag-selected-row-background-color: #e0e7ff;
+  --ag-border-color: #e2e8f0;
+  --ag-row-border-color: #f1f5f9;
+  --ag-odd-row-background-color: #ffffff;
+  --ag-even-row-background-color: #fafafa;
+}
+
+.ag-theme-quartz .ag-cell {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  line-height: 1.5;
+}
+
+.ag-theme-quartz .ag-header-cell {
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+}
+
+.ag-theme-quartz .ag-cell-wrapper {
+  width: 100%;
+  overflow: hidden;
+}
+
+.ag-theme-quartz .ag-cell-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+/* Allow text selection in cells */
+.ag-theme-quartz .ag-cell-value {
+  user-select: text;
+  -webkit-user-select: text;
 }

@@ -39,7 +39,6 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [usingMock, setUsingMock] = useState(false);
   const [isAddingNewItem, setIsAddingNewItem] = useState(false);
-  const [hasExportedOnce, setHasExportedOnce] = useState(false);
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [emailContent, setEmailContent] = useState<string>("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -224,8 +223,6 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
 
     const safePONumber = (po.PONumber || decodeURIComponent(poNumber)).replace(/[^\w\-]+/g, "_");
     xlsx.writeFile(workbook, `${safePONumber}_completed_items.xlsx`);
-
-    setHasExportedOnce(true);
   };
 
   const generateEmailContent = (): string => {
@@ -416,16 +413,36 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="text-center">
+          <svg className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <div className="text-lg font-medium text-slate-700">Loading purchase order...</div>
+        </div>
       </div>
     );
   }
 
   if (!po) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg text-red-600">PO not found</div>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <div className="text-xl font-semibold text-slate-900 mb-2">PO not found</div>
+          <div className="text-slate-600 mb-6">The purchase order you&apos;re looking for doesn&apos;t exist.</div>
+          <Link
+            href="/"
+            className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
+          >
+            Back to Dashboard
+          </Link>
+        </div>
       </div>
     );
   }
@@ -436,77 +453,116 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
   const completedCount = items.length - incompleteCount;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-slate-200 shadow-sm px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Review PO: {decodeURIComponent(poNumber)}
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            Review PO: <span className="text-blue-600">{decodeURIComponent(poNumber)}</span>
             {usingMock && (
-              <span className="ml-2 text-sm font-normal text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                (Mock Data)
+              <span className="ml-2 text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 px-2 py-1 rounded-full">
+                Mock Data
               </span>
             )}
           </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            {po.ClientName} • {items.length} items • {incompleteCount} incomplete
+          <p className="text-sm text-slate-600 mt-1 flex items-center gap-2">
+            <span className="font-medium">{po.ClientName}</span>
+            <span>•</span>
+            <span>{items.length} {items.length === 1 ? "item" : "items"}</span>
+            {incompleteCount > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-red-600 font-medium">{incompleteCount} incomplete</span>
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={handleGenerateEmail}
             disabled={!hasIncomplete || items.length === 0}
-            className={`px-4 py-2 rounded-md border font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg border font-medium transition-colors flex items-center gap-2 ${
               !hasIncomplete || items.length === 0
-                ? "border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "border-blue-300 bg-white hover:bg-blue-50 text-blue-700"
+                ? "border-slate-300 bg-slate-100 text-slate-400 cursor-not-allowed"
+                : "border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700"
             }`}
           >
-            Generate Email Content
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Generate Email
           </button>
           {!usingMock && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}
-              className="px-4 py-2 rounded-md border border-red-300 bg-white hover:bg-red-50 text-red-700 font-medium transition-colors disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-medium transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {isDeleting ? "Deleting..." : "Delete PO"}
+              {isDeleting ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete PO
+                </>
+              )}
             </button>
           )}
           <Link
             href="/"
-            className="px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 font-medium transition-colors"
+            className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors flex items-center gap-2"
           >
-            Back to Dashboard
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Dashboard
           </Link>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden gap-4 p-4">
         {/* Left Side - PDF Viewer */}
-        <div className="w-1/2 border-r border-gray-200 bg-gray-100 flex flex-col min-w-0">
-          <div className="bg-white border-b border-gray-200 px-4 py-3 shrink-0">
-            <h2 className="text-lg font-semibold text-gray-900">PO Document</h2>
+        <div className="w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col min-w-0 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 px-5 py-4 shrink-0">
+            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              PO Document
+            </h2>
             {po?.PO && po.PO.length > 0 && (
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-slate-600 mt-1 font-mono">
                 {po.PO[0].split('/').pop() || po.PO[0]}
               </p>
             )}
           </div>
-          <div className="flex-1 overflow-hidden p-4">
+          <div className="flex-1 overflow-hidden p-4 bg-slate-50">
             {pdfUrl ? (
               <iframe
                 src={pdfUrl}
-                className="w-full h-full border border-gray-300 rounded-lg bg-white min-h-0"
+                className="w-full h-full border border-slate-300 rounded-lg bg-white shadow-sm min-h-0"
                 title="PO PDF"
                 style={{ minHeight: 0 }}
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-gray-500">
+              <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <p className="mb-2">No PDF available</p>
-                  <p className="text-sm text-gray-400">PDF viewer will appear here when available</p>
+                  <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-slate-700 font-medium mb-1">No PDF available</p>
+                  <p className="text-sm text-slate-500">PDF viewer will appear here when available</p>
                 </div>
               </div>
             )}
@@ -514,15 +570,21 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
         </div>
 
         {/* Right Side - Item Review */}
-        <div className="w-1/2 flex flex-col bg-white">
-          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Item Review</h2>
-            <div className="flex flex-col items-end text-sm text-gray-600">
-              <span>
-                Progress: {currentIndex + 1} / {items.length}
-              </span>
-              <span className="text-xs text-gray-500">
-                Completed: {completedCount} {completedCount === 1 ? "item" : "items"}
+        <div className="w-1/2 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Item Review
+            </h2>
+            <div className="flex flex-col items-end">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <span>Progress:</span>
+                <span className="text-blue-600">{currentIndex + 1} / {items.length}</span>
+              </div>
+              <span className="text-xs text-slate-500 mt-0.5">
+                {completedCount} of {items.length} completed
               </span>
             </div>
           </div>
@@ -550,50 +612,77 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
           </div>
 
           {/* Navigation Footer */}
-          <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
-            <div className="flex items-center justify-between">
+          <div className="border-t border-slate-200 bg-gradient-to-r from-slate-50 to-white px-6 py-4">
+            <div className="flex items-center justify-between gap-4">
               <button
                 onClick={handlePrevious}
                 disabled={currentIndex === 0 || isAddingNewItem}
-                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                   currentIndex === 0 || isAddingNewItem
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm"
                 }`}
               >
-                ← Previous
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Previous
               </button>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap justify-center">
                 {!isAddingNewItem && (
                   <button
                     onClick={handleAddItem}
-                    className="px-4 py-2 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
+                    className="px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2"
                   >
-                    + Add Item
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Item
                   </button>
                 )}
                 {hasIncomplete && !isAddingNewItem && (
-                  <span className="text-sm text-red-600 font-medium">
-                    ⚠️ {incompleteCount} incomplete item(s)
+                  <span className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 font-medium flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    {incompleteCount} incomplete
                   </span>
                 )}
                 {!isAddingNewItem && completedCount > 0 && (
                   <button
                     type="button"
                     onClick={handleExportCompletedItems}
-                    className="px-4 py-2 rounded-md border border-blue-300 bg-white text-blue-700 text-sm font-medium hover:bg-blue-50 transition-colors"
+                    className="px-4 py-2 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-2"
                   >
-                    {hasExportedOnce ? "Export Completed Items Again" : "Export Completed Items (Excel)"}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export Excel
                   </button>
                 )}
                 {!isAddingNewItem && (
                   <button
                     onClick={handleFinishReview}
                     disabled={saving}
-                    className="px-6 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 disabled:cursor-not-allowed transition-colors shadow-md flex items-center gap-2"
                   >
-                    {saving ? "Saving..." : "Finish Review"}
+                    {saving ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Finish Review
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -601,13 +690,16 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
               <button
                 onClick={handleNext}
                 disabled={currentIndex === items.length - 1 || isAddingNewItem}
-                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                   currentIndex === items.length - 1 || isAddingNewItem
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm"
                 }`}
               >
-                Next →
+                Next
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
           </div>
@@ -622,30 +714,39 @@ export default function ReviewPage({ params }: { params: Promise<{ poNumber: str
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Delete Purchase Order</h2>
-            <p className="text-gray-700 mb-6">
-              Are you sure you want to delete PO <strong>{po?.PONumber}</strong>? This action cannot be undone and will delete:
-              <ul className="list-disc list-inside mt-2 text-sm text-gray-600">
-                <li>The PO from the database</li>
-                <li>All associated items</li>
-                <li>All files from S3</li>
-                <li>All file metadata</li>
-              </ul>
-            </p>
-            <div className="flex justify-end gap-3">
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 border border-slate-200">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-slate-900 mb-2">Delete Purchase Order</h2>
+                <p className="text-slate-700 mb-4">
+                  Are you sure you want to delete PO <strong className="text-slate-900">{po?.PONumber}</strong>? This action cannot be undone and will delete:
+                </p>
+                <ul className="list-disc list-inside mt-2 text-sm text-slate-600 space-y-1">
+                  <li>The PO from the database</li>
+                  <li>All associated items</li>
+                  <li>All files from S3</li>
+                  <li>All file metadata</li>
+                </ul>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 font-medium transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeletePO}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-md bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed shadow-sm"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
               </button>

@@ -24,29 +24,37 @@ export default function ItemCard({
   onCancelNewItem,
 }: ItemCardProps) {
   return (
-    <div className={`bg-white rounded-lg shadow-sm p-6 space-y-4 ${isNewItem ? "border-2 border-green-400" : "border border-gray-200"}`}>
-      <div className="flex items-center justify-between mb-4 pb-4 border-b">
-        <h3 className="text-lg font-semibold text-gray-900">
+    <div className={`bg-white rounded-xl shadow-sm p-6 space-y-5 ${isNewItem ? "border-2 border-green-400 bg-green-50/30" : "border border-slate-200"}`}>
+      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200">
+        <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
           {isNewItem ? (
-            <span className="text-green-600">New Item (Position {index + 1} of {totalItems})</span>
+            <>
+              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              <span className="text-green-600">New Item</span>
+              <span className="text-sm font-normal text-slate-500">(Position {index + 1} of {totalItems})</span>
+            </>
           ) : (
-            <>Item {index + 1} of {totalItems}</>
+            <>
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              <span>Item {index + 1}</span>
+              <span className="text-sm font-normal text-slate-500">of {totalItems}</span>
+            </>
           )}
         </h3>
         <div className="flex items-center gap-3">
           {!isNewItem && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-sm font-medium text-gray-700">Mark as Incomplete</span>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <span className="text-sm font-medium text-slate-700">Mark as Incomplete</span>
               <button
                 onClick={() => onToggleIncomplete(index)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                  item.IsIncomplete ? "bg-red-500" : "bg-gray-300"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-inner ${
+                  item.IsIncomplete ? "bg-red-500" : "bg-slate-300"
                 }`}
                 role="switch"
                 aria-checked={item.IsIncomplete}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
                     item.IsIncomplete ? "translate-x-6" : "translate-x-1"
                   }`}
                 />
@@ -56,9 +64,9 @@ export default function ItemCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Vendor Style Code
           </label>
           <input
@@ -67,12 +75,13 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, VendorStyleCode: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            placeholder="Enter vendor style code"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Item Ref No
           </label>
           <input
@@ -81,12 +90,13 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, ItemRefNo: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            placeholder="Enter item ref number"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Item PO No
           </label>
           <input
@@ -95,12 +105,13 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, ItemPoNo: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            placeholder="Enter item PO number"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Order Quantity
           </label>
           <input
@@ -109,12 +120,14 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, OrderQty: parseInt(e.target.value) || 0 })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            placeholder="0"
+            min="0"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Metal
           </label>
           <select
@@ -122,7 +135,7 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, Metal: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900"
           >
             <option value="">Select metal</option>
             <option value="G09KT">G09KT</option>
@@ -135,7 +148,7 @@ export default function ItemCard({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Tone
           </label>
           <input
@@ -144,12 +157,13 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, Tone: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            placeholder="Enter tone"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Category
           </label>
           <input
@@ -158,12 +172,13 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, Category: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            placeholder="Enter category"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Item Size
           </label>
           <input
@@ -172,12 +187,13 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, ItemSize: e.target.value || null })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            placeholder="Enter item size"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Stock Type
           </label>
           <select
@@ -185,7 +201,7 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, StockType: e.target.value || null })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900"
           >
             <option value="">Select stock type</option>
             <option value="Studded Gold Jewellery IC">Studded Gold Jewellery IC</option>
@@ -202,7 +218,7 @@ export default function ItemCard({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Make Type
           </label>
           <select
@@ -210,7 +226,7 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, MakeType: e.target.value || null })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900"
           >
             <option value="">Select make type</option>
             <option value="CNC">CNC</option>
@@ -223,7 +239,7 @@ export default function ItemCard({
         </div>
 
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Customer Production Instruction
           </label>
           <textarea
@@ -231,13 +247,14 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, CustomerProductionInstruction: e.target.value || null })
             }
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={3}
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y"
+            placeholder="Enter customer production instructions"
           />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Special Remarks
           </label>
           <textarea
@@ -245,13 +262,14 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, SpecialRemarks: e.target.value || null })
             }
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={3}
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y"
+            placeholder="Enter special remarks"
           />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Design Production Instruction
           </label>
           <textarea
@@ -259,13 +277,14 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, DesignProductionInstruction: e.target.value || null })
             }
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={3}
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y"
+            placeholder="Enter design production instructions"
           />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Stamp Instruction
           </label>
           <textarea
@@ -273,13 +292,14 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, StampInstruction: e.target.value || null })
             }
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={3}
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y"
+            placeholder="Enter stamp instructions"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Deadline Date
           </label>
           <input
@@ -295,12 +315,12 @@ export default function ItemCard({
                 DeadlineDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
               })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Shipping Date
           </label>
           <input
@@ -316,12 +336,12 @@ export default function ItemCard({
                 ShippingDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
               })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Invoice Number
           </label>
           <input
@@ -330,31 +350,38 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, InvoiceNumber: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            placeholder="Enter invoice number"
           />
         </div>
       </div>
 
       {item.IsIncomplete && !isNewItem && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+        <div className="mt-5 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
           <p className="text-sm text-red-800 font-medium">
-            ⚠️ This item is marked as incomplete
+            This item is marked as incomplete. Please fill in all required fields.
           </p>
         </div>
       )}
 
       {isNewItem && (
-        <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-end gap-3">
+        <div className="mt-6 pt-5 border-t border-slate-200 flex items-center justify-end gap-3">
           <button
             onClick={onCancelNewItem}
-            className="px-4 py-2 rounded-md border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+            className="px-5 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors shadow-sm"
           >
             Cancel
           </button>
           <button
             onClick={onSaveNewItem}
-            className="px-6 py-2 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
+            className="px-6 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors shadow-md flex items-center gap-2"
           >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
             Save Item
           </button>
         </div>
