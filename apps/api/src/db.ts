@@ -3,19 +3,21 @@ import path from 'path';
 
 export interface POItem {
   IsIncomplete: boolean;
-  ClientItemCode: string;
-  ChandraItemCode: string;
-  JobBagNumber: string;
-  Description: string;
-  Quantity: number;
-  MetalType: string;
-  MetalColor: string;
+  VendorStyleCode: string;
+  ItemRefNo: string;
+  ItemPoNo: string;
+  OrderQty: number;
+  Metal: string;
+  Tone: string;
   Category: string;
-  Remarks: string;
-  Size?: string;
-  StampingInstructions: string;
-  StampRequired: boolean;
-  DeadlineDate?: string;
+  StockType?: string | null;
+  MakeType?: string | null;
+  CustomerProductionInstruction?: string | null;
+  SpecialRemarks?: string | null;
+  DesignProductionInstruction?: string | null;
+  StampInstruction?: string | null;
+  ItemSize?: string | null;
+  DeadlineDate?: string | null;
   ShippingDate?: string | null;
   InvoiceNumber: string;
 }
