@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: cd apps/backend && npm start
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: FASTAPI_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_S3_BUCKET
+        sync: false
+      - key: AWS_S3_PRIVATE_BUCKET
+        sync: false
+      - key: PORT
+        value: 10000
+      - key: FASTAPI_TIMEOUT_MS
+        value: 600000
+      - key: CORS_ORIGIN
+        sync: false
+        optional: true
+

@@ -15,11 +15,19 @@ genai.configure(api_key=API_KEY)
 
 app = FastAPI(title="Invoice Extraction API", version="1.0")
 
+# CORS configuration - allow specific origins or all in development
+cors_origins = os.getenv("CORS_ORIGIN", "*")
+if cors_origins == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [origin.strip() for origin in cors_origins.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 PROMPT = """

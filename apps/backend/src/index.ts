@@ -10,7 +10,17 @@ connectDB();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 const app = express();
 
-app.use(cors());
+// CORS configuration - allow specific origins or all in development
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN 
+    ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+    : '*', // Allow all origins if not specified (for development)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get('/', (_req, res) => {
