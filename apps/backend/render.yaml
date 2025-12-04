@@ -3,7 +3,7 @@ services:
     name: backend
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npx turbo run build --filter=backend...
     startCommand: cd apps/backend && npm start
     envVars:
       - key: MONGO_URI
