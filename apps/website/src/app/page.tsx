@@ -1,8 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ValueFormatterParams, ICellRendererParams } from "ag-grid-community";
+import type {
+  ColDef,
+  ValueFormatterParams,
+  ICellRendererParams,
+  GridApi,
+  GridReadyEvent,
+  IDatasource,
+  IGetRowsParams,
+} from "ag-grid-community";
 import type { PurchaseOrder } from "../types/po";
 import { useRouter } from "next/navigation";
 import { getApiEndpoint } from "@/lib/api";
@@ -11,12 +19,27 @@ import { getApiEndpoint } from "@/lib/api";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
 
+type ClientRecord = {
+  _id?: string;
+  name: string;
+  mapping: string;
+  description?: string | null;
+};
+
 export default function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [rowData, setRowData] = useState<PurchaseOrder[]>([]);
+  const gridApiRef = useRef<GridApi<PurchaseOrder> | null>(null);
   const [uploading, setUploading] = useState(false);
   const [deletingPO, setDeletingPO] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ poNumber: string; clientName: string } | null>(null);
+  const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+  const [clientLoading, setClientLoading] = useState(false);
+  const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientMapping, setNewClientMapping] = useState("");
+  const [pendingClientSelection, setPendingClientSelection] = useState<{ clientId?: string; clientName: string; clientMapping?: string } | null>(null);
   const router = useRouter();
 
   const ActionCellRenderer = useCallback(
@@ -196,34 +219,118 @@ export default function DashboardPage() {
     [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer]
   );
 
-  const onUploadClick = () => fileInputRef.current?.click();
+  const createDataSource = useCallback(
+    (): IDatasource => ({
+      getRows: async (params: IGetRowsParams) => {
+        const { startRow, endRow } = params;
+        try {
+          const res = await fetch(
+            getApiEndpoint(`/po?startRow=${startRow}&endRow=${endRow}`),
+          );
+          if (!res.ok) {
+            throw new Error("Failed to load purchase orders");
+          }
+          const payload = await res.json();
+          const rows: PurchaseOrder[] = Array.isArray(payload)
+            ? payload
+            : payload?.rowData || payload?.data || [];
+          const totalRowCount =
+            typeof payload?.rowCount === "number"
+              ? payload.rowCount
+              : rows.length;
 
-  const loadPOs = async () => {
+          params.successCallback(rows, totalRowCount);
+        } catch (error) {
+          console.error("Failed to fetch purchase orders", error);
+          params.failCallback();
+        }
+      },
+    }),
+    [],
+  );
+
+  const refreshGrid = useCallback(() => {
+    if (gridApiRef.current) {
+      gridApiRef.current.purgeInfiniteCache();
+    }
+  }, []);
+
+  const onGridReady = useCallback(
+    (params: GridReadyEvent<PurchaseOrder>) => {
+      gridApiRef.current = params.api;
+      // Set datasource using setGridOption for infinite row model
+      params.api.setGridOption('datasource', createDataSource());
+    },
+    [createDataSource],
+  );
+
+  const loadClients = async () => {
+    setClientLoading(true);
     try {
-      const res = await fetch(getApiEndpoint("/po"));
+      const res = await fetch(getApiEndpoint("/po/clients"));
       if (!res.ok) {
-        throw new Error("Failed to load purchase orders");
+        throw new Error("Failed to load clients");
       }
-      const payload = await res.json();
-      const data: PurchaseOrder[] = Array.isArray(payload) ? payload : payload?.data || [];
-      setRowData(Array.isArray(data) ? data : []);
-    } catch {
-      // noop for now
+      const data = await res.json();
+      setClients(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to fetch clients", error);
+      alert("Could not load clients. Please try again.");
+    } finally {
+      setClientLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadPOs();
-  }, []);
+  const onUploadClick = () => {
+    setClientModalOpen(true);
+    if (!clients.length && !clientLoading) {
+      void loadClients();
+    }
+  };
+
+  const resetClientSelection = () => {
+    setPendingClientSelection(null);
+    setSelectedClientId(null);
+    setNewClientName("");
+    setNewClientMapping("");
+    setClientMode("existing");
+  };
+
+  const handleClientConfirm = () => {
+    if (clientMode === "existing") {
+      const selected = clients.find((c) => c._id === selectedClientId);
+      if (!selected) {
+        alert("Please select a client");
+        return;
+      }
+      setPendingClientSelection({ clientId: selected._id, clientName: selected.name, clientMapping: selected.mapping });
+    } else {
+      if (!newClientName.trim() || !newClientMapping.trim()) {
+        alert("Enter client name and mapping");
+        return;
+      }
+      setPendingClientSelection({ clientName: newClientName.trim(), clientMapping: newClientMapping.trim() });
+    }
+
+    setClientModalOpen(false);
+    fileInputRef.current?.click();
+  };
 
   const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!pendingClientSelection) {
+      alert("Select a client before uploading.");
+      return;
+    }
     
     setUploading(true);
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append("clientName", pendingClientSelection.clientName);
+      if (pendingClientSelection.clientId) form.append("clientId", pendingClientSelection.clientId);
+      if (pendingClientSelection.clientMapping) form.append("clientMapping", pendingClientSelection.clientMapping);
       const res = await fetch(getApiEndpoint("/po/upload"), {
         method: "POST",
         body: form,
@@ -242,7 +349,7 @@ export default function DashboardPage() {
         router.push(`/review/${encodeURIComponent(poNumber)}`);
       } else {
         // Fallback: reload the list if PO number is not available
-        await loadPOs();
+        refreshGrid();
         alert("PO uploaded successfully");
       }
     } catch (err) {
@@ -251,6 +358,7 @@ export default function DashboardPage() {
       alert(errorMessage);
     } finally {
       setUploading(false);
+      resetClientSelection();
       e.target.value = "";
     }
   };
@@ -272,7 +380,7 @@ export default function DashboardPage() {
       }
 
       // Reload the PO list after successful deletion
-      await loadPOs();
+      refreshGrid();
       setShowDeleteConfirm(null);
     } catch (err) {
       console.error("Delete error:", err);
@@ -298,7 +406,7 @@ export default function DashboardPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               onChange={handleFileChange}
               className="hidden"
             />
@@ -331,18 +439,18 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="ag-theme-quartz w-full h-[calc(100vh-200px)] min-h-[600px]">
             <AgGridReact<PurchaseOrder>
-              rowData={rowData}
               columnDefs={columnDefs}
               animateRows
-              pagination
-              paginationAutoPageSize
-              paginationPageSize={20}
+              rowModelType="infinite"
+              cacheBlockSize={50}
+              maxBlocksInCache={2}
               rowHeight={56}
               headerHeight={56}
               suppressHorizontalScroll={false}
               enableCellTextSelection={true}
               ensureDomOrder={true}
               suppressRowClickSelection={true}
+              onGridReady={onGridReady}
               onRowDoubleClicked={(event) => {
                 const poNumber = event.data?.PONumber;
                 if (poNumber) {
@@ -358,6 +466,129 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Client selection dialog */}
+      {clientModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 border border-slate-200">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Choose client mapping</h2>
+                <p className="text-slate-600 text-sm mt-1">
+                  Select an existing client or add a new mapping before uploading the PO PDF.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setClientModalOpen(false);
+                  resetClientSelection();
+                }}
+                className="text-slate-500 hover:text-slate-700"
+                aria-label="Close client dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex gap-4 mb-4">
+              <button
+                className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                  clientMode === "existing"
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-white border-slate-200 text-slate-700"
+                }`}
+                onClick={() => setClientMode("existing")}
+              >
+                Use existing client
+              </button>
+              <button
+                className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                  clientMode === "new"
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-white border-slate-200 text-slate-700"
+                }`}
+                onClick={() => setClientMode("new")}
+              >
+                Create new mapping
+              </button>
+            </div>
+
+            {clientMode === "existing" ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-700">Select client</label>
+                  <button
+                    onClick={() => void loadClients()}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                    disabled={clientLoading}
+                  >
+                    {clientLoading ? "Refreshing..." : "Refresh"}
+                  </button>
+                </div>
+                <select
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={selectedClientId ?? ""}
+                  onChange={(e) => setSelectedClientId(e.target.value)}
+                  disabled={clientLoading}
+                >
+                  <option value="">Select a client</option>
+                  {clients.map((client) => (
+                    <option key={client._id ?? client.name} value={client._id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedClientId && (
+                  <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 max-h-40 overflow-auto text-sm whitespace-pre-line">
+                    {clients.find((c) => c._id === selectedClientId)?.mapping}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Client name</label>
+                  <input
+                    type="text"
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter client name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Mapping / instructions</label>
+                  <textarea
+                    value={newClientMapping}
+                    onChange={(e) => setNewClientMapping(e.target.value)}
+                    rows={8}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Add column mapping and extraction notes"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-slate-200">
+              <button
+                onClick={() => {
+                  setClientModalOpen(false);
+                  resetClientSelection();
+                }}
+                className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClientConfirm}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                Continue & upload PO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (

@@ -44,18 +44,18 @@ export default function ItemCard({
         <div className="flex items-center gap-3">
           {!isNewItem && (
             <label className="flex items-center gap-3 cursor-pointer">
-              <span className="text-sm font-medium text-slate-700">Mark as Incomplete</span>
+              <span className="text-sm font-medium text-slate-700">Mark as Complete</span>
               <button
                 onClick={() => onToggleIncomplete(index)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-inner ${
-                  item.IsIncomplete ? "bg-red-500" : "bg-slate-300"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-inner ${
+                  item.IsIncomplete ? "bg-slate-300" : "bg-green-500"
                 }`}
                 role="switch"
-                aria-checked={item.IsIncomplete}
+                aria-checked={!item.IsIncomplete}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
-                    item.IsIncomplete ? "translate-x-6" : "translate-x-1"
+                    item.IsIncomplete ? "translate-x-1" : "translate-x-6"
                   }`}
                 />
               </button>
@@ -358,7 +358,7 @@ export default function ItemCard({
 
       {item.IsIncomplete && !isNewItem && (
         <div className="mt-5 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-          <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <p className="text-sm text-red-800 font-medium">

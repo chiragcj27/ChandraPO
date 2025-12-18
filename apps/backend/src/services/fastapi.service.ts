@@ -8,13 +8,23 @@ dotenv.config();
 const FASTAPI_BASE_URL = (process.env.FASTAPI_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 export const fastapiService = {
-  async extractPurchaseOrder(file: Express.Multer.File): Promise<ExtractedPOResponse> {
+  async extractPurchaseOrder(
+    file: Express.Multer.File,
+    options?: { clientName?: string; mappingText?: string },
+  ): Promise<ExtractedPOResponse> {
     const formData = new FormData();
     formData.append('file', file.buffer, {
       filename: file.originalname,
       contentType: file.mimetype,
       knownLength: file.size,
     });
+
+    if (options?.clientName) {
+      formData.append('client_name', options.clientName);
+    }
+    if (options?.mappingText) {
+      formData.append('mapping_text', options.mappingText);
+    }
 
     const timeout = Number(process.env.FASTAPI_TIMEOUT_MS || 600000); // Default 10 minutes (600000ms)
     const startTime = Date.now();
