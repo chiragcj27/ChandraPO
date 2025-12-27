@@ -188,25 +188,78 @@ const mapDTOToDoc = async (dto: PurchaseOrderDTO): Promise<Partial<any>> => {
   };
 };
 
+// Normalize enum values to match dropdown options exactly
+const normalizeMetal = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.trim();
+  const metalMap: Record<string, string> = {
+    'G09KT': 'G09KT', 'G10KT': 'G10KT', 'G14KT': 'G14KT', 'G18KT': 'G18KT', '950': '950', 'SV925': 'SV925',
+    '9KT': 'G09KT', '10KT': 'G10KT', '14K': 'G14KT', '18K': 'G18KT',
+    'PLATINUM': '950', 'PT950': '950', 'SILVER': 'SV925', '925': 'SV925',
+  };
+  return metalMap[normalized.toUpperCase()] || normalized;
+};
+
+const normalizeTone = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.trim().toUpperCase();
+  const toneMap: Record<string, string> = {
+    'Y': 'Y', 'R': 'R', 'W': 'W', 'YW': 'YW', 'RW': 'RW', 'RY': 'RY',
+    'YELLOW': 'Y', 'ROSE': 'R', 'WHITE': 'W',
+    'YELLOW WHITE': 'YW', 'Y/W': 'YW', 'YELLOW-WHITE': 'YW',
+    'ROSE WHITE': 'RW', 'R/W': 'RW', 'ROSE-WHITE': 'RW',
+    'ROSE YELLOW': 'RY', 'R/Y': 'RY', 'ROSE-YELLOW': 'RY',
+  };
+  return toneMap[normalized] || value.trim();
+};
+
+const normalizeStockType = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const normalized = value.trim();
+  // Exact match first
+  const stockTypes = [
+    'Studded Gold Jewellery IC', 'Studded Platinum Jewellery IC', 'Plain Gold Jewellery IC',
+    'Plain Platinum Jewellery IC', 'Studded Semi Mount Gold Jewellery IC', 'Studded Silver Jewellery IC',
+    'Plain Silver Jewellery IC', 'Studded Semi Mount Platinum Jewellery IC', 'Gold Mount Jewellery IC',
+    'Studded Combination Jewellery IC',
+  ];
+  if (stockTypes.includes(normalized)) return normalized;
+  // Case-insensitive match
+  const upperNormalized = normalized.toUpperCase();
+  const match = stockTypes.find(st => st.toUpperCase() === upperNormalized);
+  return match || null;
+};
+
+const normalizeMakeType = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const normalized = value.trim();
+  const makeTypes = ['CNC', 'HOLLOW TUBING', '1 PC CAST', '2 PC CAST', 'MULTI CAST', 'HIP HOP'];
+  if (makeTypes.includes(normalized)) return normalized;
+  // Case-insensitive match
+  const upperNormalized = normalized.toUpperCase();
+  const match = makeTypes.find(mt => mt.toUpperCase() === upperNormalized);
+  return match || null;
+};
+
 const mapExtractionLineToRecord = (line: ExtractedLine, invoiceNumber?: string): POItemRecord => ({
   isIncomplete: true, // Default to true as per requirements
-  vendorStyleCode: line.VendorStyleCode || '',
-  itemRefNo: line.ItemRefNo || '',
-  itemPoNo: line.ItemPoNo || '',
+  vendorStyleCode: (line.VendorStyleCode || '').trim(),
+  itemRefNo: (line.ItemRefNo || '').trim(),
+  itemPoNo: (line.ItemPoNo || '').trim(),
   orderQty: Number(line.OrderQty) || 0,
-  metal: line.Metal || '',
-  tone: line.Tone || '',
-  category: line.Category || '',
-  stockType: line.StockType ?? null,
-  makeType: line.MakeType ?? null,
-  customerProductionInstruction: line.CustomerProductionInstruction ?? null,
-  specialRemarks: line.SpecialRemarks ?? null,
-  designProductionInstruction: line.DesignProductionInstruction ?? null,
-  stampInstruction: line.StampInstruction ?? null,
-  itemSize: line.ItemSize !== undefined && line.ItemSize !== null ? String(line.ItemSize) : null,
+  metal: normalizeMetal(line.Metal),
+  tone: normalizeTone(line.Tone),
+  category: (line.Category || '').trim(),
+  stockType: normalizeStockType(line.StockType),
+  makeType: normalizeMakeType(line.MakeType),
+  customerProductionInstruction: line.CustomerProductionInstruction ? line.CustomerProductionInstruction.trim() : null,
+  specialRemarks: line.SpecialRemarks ? line.SpecialRemarks.trim() : null,
+  designProductionInstruction: line.DesignProductionInstruction ? line.DesignProductionInstruction.trim() : null,
+  stampInstruction: line.StampInstruction ? line.StampInstruction.trim() : null,
+  itemSize: line.ItemSize !== undefined && line.ItemSize !== null ? String(line.ItemSize).trim() : null,
   deadlineDate: null,
   shippingDate: null,
-  invoiceNumber: invoiceNumber || '',
+  invoiceNumber: (invoiceNumber || '').trim(),
 });
 
 const buildPOFromExtraction = async (

@@ -151,15 +151,21 @@ export default function ItemCard({
           <label className="block text-sm font-semibold text-slate-700 mb-2">
             Tone
           </label>
-          <input
-            type="text"
+          <select
             value={item.Tone || ""}
             onChange={(e) =>
               onUpdateItem(index, { ...item, Tone: e.target.value })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
-            placeholder="Enter tone"
-          />
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900"
+          >
+            <option value="">Select tone</option>
+            <option value="Y">Y</option>
+            <option value="R">R</option>
+            <option value="W">W</option>
+            <option value="YW">YW</option>
+            <option value="RW">RW</option>
+            <option value="RY">RY</option>
+          </select>
         </div>
 
         <div>
