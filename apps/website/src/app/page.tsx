@@ -203,7 +203,7 @@ function DashboardPage() {
           return value > 0 ? value.toString() : "0";
         },
       },
-      { 
+      {
         headerName: "Action", 
         field: "PONumber", 
         sortable: false, 
@@ -222,7 +222,7 @@ function DashboardPage() {
         minWidth: 90,
         pinned: "right",
         cellRenderer: DeleteCellRenderer,
-      }] : []),
+      } as ColDef<PurchaseOrder>] : []),
     ],
     [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer]
   );
@@ -748,55 +748,79 @@ function DashboardPage() {
                     <p className="text-slate-700 mb-4">{uploadProgress.message}</p>
                     
                     {/* Progress Steps */}
-                    <div className="space-y-3 mt-4">
-                      <div className={`flex items-center gap-3 ${uploadProgress.stage === 'uploading' ? 'opacity-100' : uploadProgress.stage === 'extracting' || uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete' ? 'opacity-60' : 'opacity-40'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${uploadProgress.stage === 'uploading' ? 'bg-blue-600' : uploadProgress.stage === 'extracting' || uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete' ? 'bg-green-600' : 'bg-slate-300'}`}>
-                          {uploadProgress.stage !== 'uploading' && (uploadProgress.stage === 'extracting' || uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete') ? (
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : uploadProgress.stage === 'uploading' ? (
-                            <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          ) : null}
-                        </div>
-                        <span className="text-sm text-slate-700">Uploading file to server</span>
-                      </div>
+                    {(() => {
+                      const stage = uploadProgress.stage as 'uploading' | 'extracting' | 'saving' | 'complete' | 'error';
+                      const isUploading = stage === 'uploading';
+                      const isExtracting = stage === 'extracting';
+                      const isSaving = stage === 'saving';
+                      const isComplete = stage === 'complete';
+                      const isPastUploading = isExtracting || isSaving || isComplete;
+                      const isPastExtracting = isSaving || isComplete;
                       
-                      <div className={`flex items-center gap-3 ${uploadProgress.stage === 'extracting' ? 'opacity-100' : uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete' ? 'opacity-60' : 'opacity-40'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${uploadProgress.stage === 'extracting' ? 'bg-blue-600' : uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete' ? 'bg-green-600' : 'bg-slate-300'}`}>
-                          {uploadProgress.stage !== 'extracting' && (uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete') ? (
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : uploadProgress.stage === 'extracting' ? (
-                            <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          ) : null}
-                        </div>
-                        <span className="text-sm text-slate-700">Extracting data from document</span>
-                      </div>
+                      const uploadOpacity = isUploading ? 'opacity-100' : isPastUploading ? 'opacity-60' : 'opacity-40';
+                      const uploadBg = isUploading ? 'bg-blue-600' : isPastUploading ? 'bg-green-600' : 'bg-slate-300';
+                      const uploadIcon = isUploading ? 'spinner' : isPastUploading ? 'check' : null;
                       
-                      <div className={`flex items-center gap-3 ${uploadProgress.stage === 'saving' ? 'opacity-100' : uploadProgress.stage === 'complete' ? 'opacity-60' : 'opacity-40'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${uploadProgress.stage === 'saving' ? 'bg-blue-600' : uploadProgress.stage === 'complete' ? 'bg-green-600' : 'bg-slate-300'}`}>
-                          {uploadProgress.stage === 'complete' ? (
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : uploadProgress.stage === 'saving' ? (
-                            <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          ) : null}
+                      const extractOpacity = isExtracting ? 'opacity-100' : isPastExtracting ? 'opacity-60' : 'opacity-40';
+                      const extractBg = isExtracting ? 'bg-blue-600' : isPastExtracting ? 'bg-green-600' : 'bg-slate-300';
+                      const extractIcon = isExtracting ? 'spinner' : isPastExtracting ? 'check' : null;
+                      
+                      const saveOpacity = isSaving ? 'opacity-100' : isComplete ? 'opacity-60' : 'opacity-40';
+                      const saveBg = isSaving ? 'bg-blue-600' : isComplete ? 'bg-green-600' : 'bg-slate-300';
+                      const saveIcon = isComplete ? 'check' : isSaving ? 'spinner' : null;
+                      
+                      return (
+                        <div className="space-y-3 mt-4">
+                          <div className={`flex items-center gap-3 ${uploadOpacity}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${uploadBg}`}>
+                              {uploadIcon === 'check' ? (
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : uploadIcon === 'spinner' ? (
+                                <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : null}
+                            </div>
+                            <span className="text-sm text-slate-700">Uploading file to server</span>
+                          </div>
+                          
+                          <div className={`flex items-center gap-3 ${extractOpacity}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${extractBg}`}>
+                              {extractIcon === 'check' ? (
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : extractIcon === 'spinner' ? (
+                                <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : null}
+                            </div>
+                            <span className="text-sm text-slate-700">Extracting data from document</span>
+                          </div>
+                          
+                          <div className={`flex items-center gap-3 ${saveOpacity}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${saveBg}`}>
+                              {saveIcon === 'check' ? (
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : saveIcon === 'spinner' ? (
+                                <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : null}
+                            </div>
+                            <span className="text-sm text-slate-700">Saving to database</span>
+                          </div>
                         </div>
-                        <span className="text-sm text-slate-700">Saving to database</span>
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 {uploadProgress.stage === 'extracting' && (

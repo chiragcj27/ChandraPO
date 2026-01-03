@@ -5,4 +5,5 @@ import Client from './models/client';
 import User from './models/user';
 
 export { File, PO, POItem, Client, User };
+export type { UserRole } from './models/user';
 export { default as connectDB } from './config/database';

@@ -117,7 +117,6 @@ export default function ItemCard({
             onChange={(e) =>
               onUpdateItem(index, { ...item, VendorStyleCode: e.target.value })
             }
-            disabled={readOnly}
             className={getInputClassName(item.VendorStyleCode, `w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 ${readOnly ? "bg-slate-50 cursor-not-allowed" : ""}`)}
             placeholder="Enter vendor style code"
           />
@@ -378,7 +377,7 @@ export default function ItemCard({
                 DeadlineDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
               })
             }
-            className={getInputClassName(item.DeadlineDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
+            className={getInputClassName(typeof item.DeadlineDate === 'object' && item.DeadlineDate instanceof Date ? item.DeadlineDate.toISOString() : item.DeadlineDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
           />
         </div>
 
@@ -400,7 +399,7 @@ export default function ItemCard({
                 ShippingDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
               })
             }
-            className={getInputClassName(item.ShippingDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
+            className={getInputClassName(typeof item.ShippingDate === 'object' && item.ShippingDate instanceof Date ? item.ShippingDate.toISOString() : item.ShippingDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
           />
         </div>
 

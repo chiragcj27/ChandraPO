@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { User, Client } from '@repo/db';
 import { JWT_SECRET } from '../middleware/auth.middleware';
 import type { AuthRequest } from '../middleware/auth.middleware';
+import mongoose from 'mongoose';
 
 interface LoginRequest {
   email: string;
@@ -26,12 +27,17 @@ const generateToken = (user: any): string => {
     userId: user._id.toString(),
     email: user.email,
     role: user.role,
-    clientId: user.clientId ? user.clientId.toString() : null,
+    clientId: user.clientId ? (typeof user.clientId === 'object' && user.clientId._id ? user.clientId._id.toString() : user.clientId.toString()) : null,
   };
 
-  return jwt.sign(payload, JWT_SECRET, {
+  const secret = JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is not defined');
+  }
+
+  return jwt.sign(payload, secret, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  });
+  } as jwt.SignOptions);
 };
 
 /**
@@ -75,8 +81,14 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response): 
       email: user.email,
       role: user.role,
       name: user.name || user.email,
-      clientId: user.clientId ? (typeof user.clientId === 'object' ? user.clientId._id.toString() : user.clientId.toString()) : null,
-      clientName: user.clientId && typeof user.clientId === 'object' ? user.clientId.name : null,
+      clientId: user.clientId 
+        ? (typeof user.clientId === 'object' && '_id' in user.clientId 
+          ? user.clientId._id.toString() 
+          : (user.clientId as mongoose.Types.ObjectId).toString()) 
+        : null,
+      clientName: user.clientId && typeof user.clientId === 'object' && 'name' in user.clientId 
+        ? user.clientId.name 
+        : null,
     };
 
     res.status(200).json({
@@ -186,8 +198,14 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<v
       email: user.email,
       role: user.role,
       name: user.name || user.email,
-      clientId: user.clientId ? (typeof user.clientId === 'object' ? user.clientId._id.toString() : user.clientId.toString()) : null,
-      clientName: user.clientId && typeof user.clientId === 'object' ? user.clientId.name : null,
+      clientId: user.clientId 
+        ? (typeof user.clientId === 'object' && '_id' in user.clientId 
+          ? user.clientId._id.toString() 
+          : (user.clientId as mongoose.Types.ObjectId).toString()) 
+        : null,
+      clientName: user.clientId && typeof user.clientId === 'object' && 'name' in user.clientId 
+        ? user.clientId.name 
+        : null,
     };
 
     res.status(200).json({ user: userResponse });
