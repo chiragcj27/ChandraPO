@@ -19,3 +19,40 @@ export function getApiEndpoint(endpoint: string): string {
   return `${baseUrl}${path}`;
 }
 
+/**
+ * Get auth token from localStorage
+ */
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("auth_token");
+}
+
+/**
+ * Create fetch options with auth token
+ */
+export function createAuthenticatedFetchOptions(options: RequestInit = {}): RequestInit {
+  const token = getAuthToken();
+  const headers = new Headers(options.headers);
+  
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  
+  return {
+    ...options,
+    headers,
+  };
+}
+
+/**
+ * Fetch with authentication
+ */
+export async function authenticatedFetch(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const url = getApiEndpoint(endpoint);
+  const authOptions = createAuthenticatedFetchOptions(options);
+  return fetch(url, authOptions);
+}
+

@@ -8,9 +8,11 @@ interface ItemCardProps {
   totalItems: number;
   onToggleIncomplete: (index: number) => void;
   onUpdateItem: (index: number, item: POItem) => void;
+  onDeleteItem?: (index: number) => void;
   isNewItem?: boolean;
   onSaveNewItem?: () => void;
   onCancelNewItem?: () => void;
+  readOnly?: boolean;
 }
 
 export default function ItemCard({
@@ -19,10 +21,33 @@ export default function ItemCard({
   totalItems,
   onToggleIncomplete,
   onUpdateItem,
+  onDeleteItem,
   isNewItem = false,
   onSaveNewItem,
   onCancelNewItem,
+  readOnly = false,
 }: ItemCardProps) {
+  // Helper function to check if a field is empty/null
+  const isFieldEmpty = (value: string | number | null | undefined): boolean => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === "string" && value.trim() === "") return true;
+    if (typeof value === "number" && value === 0) return true;
+    return false;
+  };
+
+  // Helper function to get input className with validation styling
+  const getInputClassName = (value: string | number | null | undefined, baseClassName: string): string => {
+    const isEmpty = isFieldEmpty(value);
+    if (isEmpty) {
+      // Replace border-slate-300 with border-red-500 and update focus colors
+      return baseClassName
+        .replace(/border-slate-300/g, "border-red-500")
+        .replace(/focus:border-blue-500/g, "focus:border-red-500")
+        .replace(/focus:ring-blue-500/g, "focus:ring-red-500");
+    }
+    return baseClassName;
+  };
+
   return (
     <div className={`bg-white rounded-xl shadow-sm p-6 space-y-5 ${isNewItem ? "border-2 border-green-400 bg-green-50/30" : "border border-slate-200"}`}>
       <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200">
@@ -41,27 +66,43 @@ export default function ItemCard({
             </>
           )}
         </h3>
-        <div className="flex items-center gap-3">
-          {!isNewItem && (
-            <label className="flex items-center gap-3 cursor-pointer">
-              <span className="text-sm font-medium text-slate-700">Mark as Complete</span>
-              <button
-                onClick={() => onToggleIncomplete(index)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-inner ${
-                  item.IsIncomplete ? "bg-slate-300" : "bg-green-500"
-                }`}
-                role="switch"
-                aria-checked={!item.IsIncomplete}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
-                    item.IsIncomplete ? "translate-x-1" : "translate-x-6"
-                  }`}
-                />
-              </button>
-            </label>
-          )}
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-3">
+            {!isNewItem && (
+              <>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <span className="text-sm font-medium text-slate-700">Mark as Complete</span>
+                  <button
+                    onClick={() => onToggleIncomplete(index)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-inner ${
+                      item.IsIncomplete ? "bg-slate-300" : "bg-green-500"
+                    }`}
+                    role="switch"
+                    aria-checked={!item.IsIncomplete}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                        item.IsIncomplete ? "translate-x-1" : "translate-x-6"
+                      }`}
+                    />
+                  </button>
+                </label>
+                {onDeleteItem && (
+                  <button
+                    onClick={() => onDeleteItem(index)}
+                    className="px-3 py-1.5 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-medium transition-colors flex items-center gap-2 text-sm shadow-sm"
+                    title="Delete this item"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-5">
@@ -72,10 +113,12 @@ export default function ItemCard({
           <input
             type="text"
             value={item.VendorStyleCode || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, VendorStyleCode: e.target.value })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            disabled={readOnly}
+            className={getInputClassName(item.VendorStyleCode, `w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 ${readOnly ? "bg-slate-50 cursor-not-allowed" : ""}`)}
             placeholder="Enter vendor style code"
           />
         </div>
@@ -87,10 +130,11 @@ export default function ItemCard({
           <input
             type="text"
             value={item.ItemRefNo || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, ItemRefNo: e.target.value })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            className={getInputClassName(item.ItemRefNo, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
             placeholder="Enter item ref number"
           />
         </div>
@@ -102,10 +146,11 @@ export default function ItemCard({
           <input
             type="text"
             value={item.ItemPoNo || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, ItemPoNo: e.target.value })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            className={getInputClassName(item.ItemPoNo, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
             placeholder="Enter item PO number"
           />
         </div>
@@ -117,10 +162,11 @@ export default function ItemCard({
           <input
             type="number"
             value={item.OrderQty || 0}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, OrderQty: parseInt(e.target.value) || 0 })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            className={getInputClassName(item.OrderQty, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
             placeholder="0"
             min="0"
           />
@@ -132,10 +178,11 @@ export default function ItemCard({
           </label>
           <select
             value={item.Metal || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, Metal: e.target.value })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900"
+            className={getInputClassName(item.Metal, "w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900")}
           >
             <option value="">Select metal</option>
             <option value="G09KT">G09KT</option>
@@ -153,10 +200,11 @@ export default function ItemCard({
           </label>
           <select
             value={item.Tone || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, Tone: e.target.value })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900"
+            className={getInputClassName(item.Tone, "w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900")}
           >
             <option value="">Select tone</option>
             <option value="Y">Y</option>
@@ -175,10 +223,11 @@ export default function ItemCard({
           <input
             type="text"
             value={item.Category || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, Category: e.target.value })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            className={getInputClassName(item.Category, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
             placeholder="Enter category"
           />
         </div>
@@ -190,10 +239,11 @@ export default function ItemCard({
           <input
             type="text"
             value={item.ItemSize || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, ItemSize: e.target.value || null })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            className={getInputClassName(item.ItemSize, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
             placeholder="Enter item size"
           />
         </div>
@@ -204,10 +254,11 @@ export default function ItemCard({
           </label>
           <select
             value={item.StockType || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, StockType: e.target.value || null })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900"
+            className={getInputClassName(item.StockType, "w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900")}
           >
             <option value="">Select stock type</option>
             <option value="Studded Gold Jewellery IC">Studded Gold Jewellery IC</option>
@@ -229,10 +280,11 @@ export default function ItemCard({
           </label>
           <select
             value={item.MakeType || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, MakeType: e.target.value || null })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900"
+            className={getInputClassName(item.MakeType, "w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900")}
           >
             <option value="">Select make type</option>
             <option value="CNC">CNC</option>
@@ -250,11 +302,12 @@ export default function ItemCard({
           </label>
           <textarea
             value={item.CustomerProductionInstruction || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, CustomerProductionInstruction: e.target.value || null })
             }
             rows={3}
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y"
+            className={getInputClassName(item.CustomerProductionInstruction, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y")}
             placeholder="Enter customer production instructions"
           />
         </div>
@@ -265,11 +318,12 @@ export default function ItemCard({
           </label>
           <textarea
             value={item.SpecialRemarks || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, SpecialRemarks: e.target.value || null })
             }
             rows={3}
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y"
+            className={getInputClassName(item.SpecialRemarks, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y")}
             placeholder="Enter special remarks"
           />
         </div>
@@ -280,11 +334,12 @@ export default function ItemCard({
           </label>
           <textarea
             value={item.DesignProductionInstruction || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, DesignProductionInstruction: e.target.value || null })
             }
             rows={3}
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y"
+            className={getInputClassName(item.DesignProductionInstruction, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y")}
             placeholder="Enter design production instructions"
           />
         </div>
@@ -295,11 +350,12 @@ export default function ItemCard({
           </label>
           <textarea
             value={item.StampInstruction || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, StampInstruction: e.target.value || null })
             }
             rows={3}
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y"
+            className={getInputClassName(item.StampInstruction, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900 resize-y")}
             placeholder="Enter stamp instructions"
           />
         </div>
@@ -315,13 +371,14 @@ export default function ItemCard({
                 ? new Date(item.DeadlineDate).toISOString().split("T")[0]
                 : ""
             }
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, {
                 ...item,
                 DeadlineDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
               })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            className={getInputClassName(item.DeadlineDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
           />
         </div>
 
@@ -336,13 +393,14 @@ export default function ItemCard({
                 ? new Date(item.ShippingDate).toISOString().split("T")[0]
                 : ""
             }
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, {
                 ...item,
                 ShippingDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
               })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            className={getInputClassName(item.ShippingDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
           />
         </div>
 
@@ -353,10 +411,11 @@ export default function ItemCard({
           <input
             type="text"
             value={item.InvoiceNumber || ""}
+            disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, InvoiceNumber: e.target.value })
             }
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900"
+            className={getInputClassName(item.InvoiceNumber, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
             placeholder="Enter invoice number"
           />
         </div>

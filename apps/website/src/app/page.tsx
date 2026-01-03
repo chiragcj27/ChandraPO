@@ -13,7 +13,9 @@ import type {
 } from "ag-grid-community";
 import type { PurchaseOrder } from "../types/po";
 import { useRouter } from "next/navigation";
-import { getApiEndpoint } from "@/lib/api";
+import { authenticatedFetch } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // AG Grid styles
 import "ag-grid-community/styles/ag-grid.css";
@@ -26,7 +28,7 @@ type ClientRecord = {
   description?: string | null;
 };
 
-export default function DashboardPage() {
+function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const gridApiRef = useRef<GridApi<PurchaseOrder> | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -40,7 +42,13 @@ export default function DashboardPage() {
   const [newClientName, setNewClientName] = useState("");
   const [newClientMapping, setNewClientMapping] = useState("");
   const [pendingClientSelection, setPendingClientSelection] = useState<{ clientId?: string; clientName: string; clientMapping?: string } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{
+    stage: 'uploading' | 'extracting' | 'saving' | 'complete' | 'error';
+    message: string;
+    error?: string;
+  } | null>(null);
   const router = useRouter();
+  const { isAdmin, user, logout } = useAuth();
 
   const ActionCellRenderer = useCallback(
     (params: ICellRendererParams<PurchaseOrder, string>) => {
@@ -53,11 +61,11 @@ export default function DashboardPage() {
           onClick={onClick} 
           className="px-3 py-1.5 rounded-md border border-blue-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 hover:border-blue-400 transition-colors"
         >
-          Review
+          {isAdmin ? "Review" : "View"}
         </button>
       );
     },
-    [router],
+    [router, isAdmin],
   );
 
   const DeleteCellRenderer = useCallback(
@@ -205,7 +213,7 @@ export default function DashboardPage() {
         pinned: "right",
         cellRenderer: ActionCellRenderer,
       },
-      { 
+      ...(isAdmin ? [{
         headerName: "Delete", 
         field: "PONumber", 
         sortable: false, 
@@ -214,7 +222,7 @@ export default function DashboardPage() {
         minWidth: 90,
         pinned: "right",
         cellRenderer: DeleteCellRenderer,
-      },
+      }] : []),
     ],
     [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer]
   );
@@ -224,8 +232,8 @@ export default function DashboardPage() {
       getRows: async (params: IGetRowsParams) => {
         const { startRow, endRow } = params;
         try {
-          const res = await fetch(
-            getApiEndpoint(`/po?startRow=${startRow}&endRow=${endRow}`),
+          const res = await authenticatedFetch(
+            `/po?startRow=${startRow}&endRow=${endRow}`,
           );
           if (!res.ok) {
             throw new Error("Failed to load purchase orders");
@@ -267,7 +275,7 @@ export default function DashboardPage() {
   const loadClients = async () => {
     setClientLoading(true);
     try {
-      const res = await fetch(getApiEndpoint("/po/clients"));
+      const res = await authenticatedFetch("/po/clients");
       if (!res.ok) {
         throw new Error("Failed to load clients");
       }
@@ -325,24 +333,64 @@ export default function DashboardPage() {
     }
     
     setUploading(true);
+    setUploadProgress({
+      stage: 'uploading',
+      message: 'Uploading file to server...',
+    });
+
     try {
       const form = new FormData();
       form.append("file", file);
       form.append("clientName", pendingClientSelection.clientName);
       if (pendingClientSelection.clientId) form.append("clientId", pendingClientSelection.clientId);
       if (pendingClientSelection.clientMapping) form.append("clientMapping", pendingClientSelection.clientMapping);
-      const res = await fetch(getApiEndpoint("/po/upload"), {
+      
+      setUploadProgress({
+        stage: 'extracting',
+        message: 'Processing document extraction... This may take a minute.',
+      });
+
+      const res = await authenticatedFetch("/po/upload", {
         method: "POST",
         body: form,
       });
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: "Upload failed" }));
-        throw new Error(errorData.message || errorData.error || "Upload failed");
+        const errorMessage = errorData.message || errorData.error || "Upload failed";
+        
+        // Check if it's a FastAPI error
+        if (errorMessage.includes('FastAPI') || errorMessage.includes('extraction')) {
+          setUploadProgress({
+            stage: 'error',
+            message: 'Extraction failed',
+            error: errorMessage,
+          });
+        } else {
+          setUploadProgress({
+            stage: 'error',
+            message: 'Upload failed',
+            error: errorMessage,
+          });
+        }
+        return;
       }
       
+      setUploadProgress({
+        stage: 'saving',
+        message: 'Saving purchase order...',
+      });
+
       const result = await res.json();
       const poNumber = result.po?.PONumber || result.poNumber;
+      
+      setUploadProgress({
+        stage: 'complete',
+        message: 'Upload successful!',
+      });
+
+      // Small delay to show success message
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       if (poNumber) {
         // Navigate to review page with the extracted PO data
@@ -350,17 +398,39 @@ export default function DashboardPage() {
       } else {
         // Fallback: reload the list if PO number is not available
         refreshGrid();
+        setUploadProgress(null);
         alert("PO uploaded successfully");
       }
     } catch (err) {
       console.error("Upload error:", err);
       const errorMessage = err instanceof Error ? err.message : "Upload failed. Please try again.";
-      alert(errorMessage);
+      
+      // Check error type
+      let errorDetail = errorMessage;
+      
+      if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        errorDetail = 'The extraction is taking longer than expected. The FastAPI service may be slow or unresponsive.';
+      } else if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Cannot connect')) {
+        errorDetail = 'Cannot connect to the extraction service. Please check if FastAPI is running.';
+      } else if (errorMessage.includes('502') || errorMessage.includes('Bad Gateway')) {
+        errorDetail = 'The extraction service returned an error. The FastAPI service may be down or overloaded.';
+      }
+      
+      setUploadProgress({
+        stage: 'error',
+        message: 'Upload failed',
+        error: errorDetail,
+      });
     } finally {
       setUploading(false);
-      resetClientSelection();
+      // Don't reset uploadProgress here - let user see the error/success state
       e.target.value = "";
     }
+  };
+
+  const closeProgressModal = () => {
+    setUploadProgress(null);
+    resetClientSelection();
   };
 
   const handleDeletePO = async () => {
@@ -370,7 +440,7 @@ export default function DashboardPage() {
     setDeletingPO(poNumber);
     
     try {
-      const res = await fetch(getApiEndpoint(`/po/${poNumber}`), {
+      const res = await authenticatedFetch(`/po/${poNumber}`, {
         method: "DELETE",
       });
 
@@ -400,37 +470,58 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               ChandraPO
             </h1>
-            <p className="text-sm text-slate-600 mt-1">Purchase Order Management System</p>
-          </div>
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <button 
-              onClick={onUploadClick} 
-              disabled={uploading}
-              className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium shadow-md hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 flex items-center gap-2"
-            >
-              {uploading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add PO
-                </>
+            <p className="text-sm text-slate-600 mt-1">
+              Purchase Order Management System
+              {user && (
+                <span className="ml-2 text-xs text-slate-500">
+                  • {user.name} ({user.role})
+                  {user.clientName && ` • ${user.clientName}`}
+                </span>
               )}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {isAdmin && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <button 
+                  onClick={onUploadClick} 
+                  disabled={uploading}
+                  className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium shadow-md hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 flex items-center gap-2"
+                >
+                  {uploading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add PO
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+            <button
+              onClick={logout}
+              className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Logout
             </button>
           </div>
         </header>
@@ -590,6 +681,137 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Upload Progress Modal */}
+      {uploadProgress && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 border border-slate-200">
+            {uploadProgress.stage === 'error' ? (
+              <>
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-slate-900 mb-2">Upload Failed</h2>
+                    <p className="text-slate-700 mb-3">{uploadProgress.message}</p>
+                    {uploadProgress.error && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+                        {uploadProgress.error}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    onClick={closeProgressModal}
+                    className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : uploadProgress.stage === 'complete' ? (
+              <>
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="shrink-0 w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-slate-900 mb-2">Upload Successful!</h2>
+                    <p className="text-slate-700">{uploadProgress.message}</p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    onClick={closeProgressModal}
+                    className="px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="shrink-0">
+                    <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-slate-900 mb-2">Processing Purchase Order</h2>
+                    <p className="text-slate-700 mb-4">{uploadProgress.message}</p>
+                    
+                    {/* Progress Steps */}
+                    <div className="space-y-3 mt-4">
+                      <div className={`flex items-center gap-3 ${uploadProgress.stage === 'uploading' ? 'opacity-100' : uploadProgress.stage === 'extracting' || uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete' ? 'opacity-60' : 'opacity-40'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${uploadProgress.stage === 'uploading' ? 'bg-blue-600' : uploadProgress.stage === 'extracting' || uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete' ? 'bg-green-600' : 'bg-slate-300'}`}>
+                          {uploadProgress.stage !== 'uploading' && (uploadProgress.stage === 'extracting' || uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete') ? (
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : uploadProgress.stage === 'uploading' ? (
+                            <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : null}
+                        </div>
+                        <span className="text-sm text-slate-700">Uploading file to server</span>
+                      </div>
+                      
+                      <div className={`flex items-center gap-3 ${uploadProgress.stage === 'extracting' ? 'opacity-100' : uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete' ? 'opacity-60' : 'opacity-40'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${uploadProgress.stage === 'extracting' ? 'bg-blue-600' : uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete' ? 'bg-green-600' : 'bg-slate-300'}`}>
+                          {uploadProgress.stage !== 'extracting' && (uploadProgress.stage === 'saving' || uploadProgress.stage === 'complete') ? (
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : uploadProgress.stage === 'extracting' ? (
+                            <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : null}
+                        </div>
+                        <span className="text-sm text-slate-700">Extracting data from document</span>
+                      </div>
+                      
+                      <div className={`flex items-center gap-3 ${uploadProgress.stage === 'saving' ? 'opacity-100' : uploadProgress.stage === 'complete' ? 'opacity-60' : 'opacity-40'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${uploadProgress.stage === 'saving' ? 'bg-blue-600' : uploadProgress.stage === 'complete' ? 'bg-green-600' : 'bg-slate-300'}`}>
+                          {uploadProgress.stage === 'complete' ? (
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : uploadProgress.stage === 'saving' ? (
+                            <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : null}
+                        </div>
+                        <span className="text-sm text-slate-700">Saving to database</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {uploadProgress.stage === 'extracting' && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs text-blue-800">
+                      <strong>Note:</strong> Document extraction can take 30-60 seconds depending on file size and complexity. Please wait...
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -633,5 +855,13 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardPageWithAuth() {
+  return (
+    <ProtectedRoute>
+      <DashboardPage />
+    </ProtectedRoute>
   );
 }

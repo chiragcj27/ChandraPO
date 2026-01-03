@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from '@repo/db';
 import poRoutes from './routes/po.routes';
+import authRoutes from './routes/auth.routes';
 import { seedDefaultClients } from './seed/clients';
 
 dotenv.config();
@@ -32,6 +33,7 @@ app.get('/', (_req, res) => {
   res.status(200).json({ status: 'ok', message: 'Backend up and running (express)' });
 });
 
+app.use('/auth', authRoutes);
 app.use('/po', poRoutes);
 
 const startServer = async () => {
