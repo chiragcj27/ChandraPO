@@ -42,6 +42,10 @@ function DashboardPage() {
   const [newClientName, setNewClientName] = useState("");
   const [newClientMapping, setNewClientMapping] = useState("");
   const [pendingClientSelection, setPendingClientSelection] = useState<{ clientId?: string; clientName: string; clientMapping?: string } | null>(null);
+  const [expectedItems, setExpectedItems] = useState<string>("");
+  const [editingMapping, setEditingMapping] = useState<string | null>(null);
+  const [editedMapping, setEditedMapping] = useState<string>("");
+  const [savingMapping, setSavingMapping] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     stage: 'uploading' | 'extracting' | 'saving' | 'complete' | 'error';
     message: string;
@@ -224,7 +228,7 @@ function DashboardPage() {
         cellRenderer: DeleteCellRenderer,
       } as ColDef<PurchaseOrder>] : []),
     ],
-    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer]
+    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, isAdmin]
   );
 
   const createDataSource = useCallback(
@@ -301,7 +305,10 @@ function DashboardPage() {
     setSelectedClientId(null);
     setNewClientName("");
     setNewClientMapping("");
+    setExpectedItems("");
     setClientMode("existing");
+    setEditingMapping(null);
+    setEditedMapping("");
   };
 
   const handleClientConfirm = () => {
@@ -331,6 +338,15 @@ function DashboardPage() {
       alert("Select a client before uploading.");
       return;
     }
+    // Basic validation for expected items (optional but recommended)
+    const trimmedExpected = expectedItems.trim();
+    if (trimmedExpected) {
+      const num = Number(trimmedExpected);
+      if (!Number.isInteger(num) || num <= 0) {
+        alert("Expected number of items must be a positive whole number.");
+        return;
+      }
+    }
     
     setUploading(true);
     setUploadProgress({
@@ -344,6 +360,9 @@ function DashboardPage() {
       form.append("clientName", pendingClientSelection.clientName);
       if (pendingClientSelection.clientId) form.append("clientId", pendingClientSelection.clientId);
       if (pendingClientSelection.clientMapping) form.append("clientMapping", pendingClientSelection.clientMapping);
+      if (expectedItems.trim()) {
+        form.append("expectedItems", expectedItems.trim());
+      }
       
       setUploadProgress({
         stage: 'extracting',
@@ -458,6 +477,60 @@ function DashboardPage() {
       alert(errorMessage);
     } finally {
       setDeletingPO(null);
+    }
+  };
+
+  const handleStartEditMapping = (clientId: string) => {
+    const client = clients.find((c) => c._id === clientId);
+    if (client) {
+      setEditingMapping(clientId);
+      setEditedMapping(client.mapping);
+    }
+  };
+
+  const handleCancelEditMapping = () => {
+    setEditingMapping(null);
+    setEditedMapping("");
+  };
+
+  const handleSaveMapping = async (clientId: string) => {
+    const client = clients.find((c) => c._id === clientId);
+    if (!client) return;
+
+    if (!editedMapping.trim()) {
+      alert("Mapping cannot be empty");
+      return;
+    }
+
+    setSavingMapping(true);
+    try {
+      const res = await authenticatedFetch("/po/clients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: client.name,
+          mapping: editedMapping.trim(),
+          description: client.description ?? null,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Save failed" }));
+        throw new Error(errorData.message || errorData.error || "Failed to save mapping");
+      }
+
+      // Reload clients to get updated data
+      await loadClients();
+      setEditingMapping(null);
+      setEditedMapping("");
+    } catch (err) {
+      console.error("Save mapping error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to save mapping. Please try again.";
+      alert(errorMessage);
+    } finally {
+      setSavingMapping(false);
     }
   };
 
@@ -630,10 +703,69 @@ function DashboardPage() {
                   ))}
                 </select>
                 {selectedClientId && (
-                  <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 max-h-40 overflow-auto text-sm whitespace-pre-line">
-                    {clients.find((c) => c._id === selectedClientId)?.mapping}
+                  <div className="space-y-2">
+                    {editingMapping === selectedClientId ? (
+                      <>
+                        <textarea
+                          value={editedMapping}
+                          onChange={(e) => setEditedMapping(e.target.value)}
+                          rows={8}
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Add column mapping and extraction notes"
+                          disabled={savingMapping}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={handleCancelEditMapping}
+                            disabled={savingMapping}
+                            className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleSaveMapping(selectedClientId)}
+                            disabled={savingMapping}
+                            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                          >
+                            {savingMapping ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 max-h-40 overflow-auto text-sm whitespace-pre-line">
+                          {clients.find((c) => c._id === selectedClientId)?.mapping}
+                        </div>
+                        <button
+                          onClick={() => handleStartEditMapping(selectedClientId)}
+                          className="w-full px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 hover:border-blue-400 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit Mapping
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Expected number of items in this PO (optional)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={expectedItems}
+                    onChange={(e) => setExpectedItems(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. 92"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Helps the AI ensure it extracts exactly this many item rows from the PO.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -656,6 +788,23 @@ function DashboardPage() {
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Add column mapping and extraction notes"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Expected number of items in this PO (optional)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={expectedItems}
+                    onChange={(e) => setExpectedItems(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. 92"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Helps the AI ensure it extracts exactly this many item rows from the PO.
+                  </p>
                 </div>
               </div>
             )}

@@ -19,6 +19,7 @@ export interface POItemInterface {
     deadlineDate?: Date | null;
     shippingDate?: Date | null;
     invoiceNumber: string;
+    exportedToExcel: boolean;
 }
 
 export const poItemSchema = new mongoose.Schema<POItemInterface>({
@@ -40,6 +41,7 @@ export const poItemSchema = new mongoose.Schema<POItemInterface>({
     deadlineDate: { type: Date, default: null },
     shippingDate: { type: Date, default: null },
     invoiceNumber: { type: String, required: true, default: "" },
+    exportedToExcel: { type: Boolean, required: true, default: false },
 }, {
     timestamps: true,
 })

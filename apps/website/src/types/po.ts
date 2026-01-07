@@ -19,6 +19,7 @@ export interface POItem {
   DeadlineDate?: Date | string | null;
   ShippingDate?: Date | string | null;
   InvoiceNumber: string;
+  ExportedToExcel?: boolean;
 }
 
 export interface PurchaseOrder {

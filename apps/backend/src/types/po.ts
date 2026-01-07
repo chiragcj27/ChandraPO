@@ -45,6 +45,7 @@ export interface PurchaseOrderItem {
   DeadlineDate?: string | null;
   ShippingDate?: string | null;
   InvoiceNumber: string;
+  ExportedToExcel?: boolean;
 }
 
 export interface PurchaseOrder {
@@ -90,6 +91,7 @@ export interface POItemRecord {
   deadlineDate?: Date | null;
   shippingDate?: Date | null;
   invoiceNumber: string;
+  exportedToExcel: boolean;
 }
 
 export interface PODocumentShape {
@@ -127,6 +129,7 @@ export interface PurchaseOrderItemDTO {
   DeadlineDate?: string | null;
   ShippingDate?: string | null;
   InvoiceNumber: string;
+  ExportedToExcel?: boolean;
 }
 
 export interface PurchaseOrderDTO {

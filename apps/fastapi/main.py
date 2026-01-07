@@ -84,13 +84,32 @@ General guidance:
 - Do not hallucinate or infer extra items; only output what exists.
 - Return ONLY valid JSON following the schema; do not include prose or markdown.
 - No of items will always be equal to maximum serial number.
+
+STRICT COUNTING PROCEDURE (VERY IMPORTANT):
+1) First, scan the document and identify all item rows by their serial numbers (Sr No, S.No, etc.).
+   - Collect these serial numbers in an internal array called "_debug_serials" (e.g. [1, 2, 3, ...]).
+   - Do NOT invent serial numbers that are not visible in the document.
+2) Then, build the "items" array with EXACTLY one item per serial number in "_debug_serials".
+   - The length of "items" MUST be exactly equal to the length of "_debug_serials".
+   - If you realize a serial number is missing or duplicated, re-scan and fix BEFORE you output JSON.
+3) Set "total_entries" to the length of the "items" array.
+
+Output:
+- Return a single JSON object matching the schema, plus an optional "_debug_serials" array at the top level.
+- Do NOT include any markdown, explanation, or extra top-level keys other than the schema and optional "_debug_serials".
 """
 
-def build_prompt(client_name_hint: str | None, mapping_text: str | None) -> str:
+def build_prompt(client_name_hint: str | None, mapping_text: str | None, expected_items: int | None) -> str:
     prompt_parts = [PROMPT_BASE.strip()]
     if client_name_hint:
         prompt_parts.append(
             f"Client name hint: {client_name_hint}. Use this as client_name if it matches the PO header."
+        )
+    if expected_items is not None:
+        prompt_parts.append(
+            f"CRITICAL: This PO contains exactly {expected_items} items. "
+            f'Your "items" array MUST have exactly {expected_items} entries. '
+            f'Set "total_entries" to {expected_items}. Count carefully and match this number exactly.'
         )
     if mapping_text:
         prompt_parts.append(
@@ -114,6 +133,7 @@ async def extract_invoice(
     file: UploadFile = File(...),
     client_name: str | None = Form(None),
     mapping_text: str | None = Form(None),
+    expected_items: int | None = Form(None),
 ):
     tmp_path = None
     gfile = None
@@ -147,7 +167,7 @@ async def extract_invoice(
         print(f"[FastAPI] Temporary file created: {tmp_path}")
 
         model = genai.GenerativeModel("gemini-2.5-flash")
-        prompt = build_prompt(client_name, mapping_text)
+        prompt = build_prompt(client_name, mapping_text, expected_items)
         
         # Handle Excel files differently - convert to text and include in prompt
         if suffix == '.xlsx' or suffix == '.xls':
@@ -198,6 +218,7 @@ async def extract_invoice(
                 generation_config={
                     # Ask the model to emit strict JSON
                     "response_mime_type": "application/json",
+                    "temperature": 0.1,
                 },
             )
         raw = response.text.strip()
@@ -365,7 +386,16 @@ async def extract_invoice(
         if "lines" in data and "items" not in data:
             data["items"] = data.pop("lines")
         data.setdefault("items", [])
-        data.setdefault("total_entries", len(data["items"]))
+
+        # Force total_entries to match actual items length, taking expected_items into account if provided
+        actual_items = len(data["items"])
+        data["total_entries"] = actual_items
+        if expected_items is not None and expected_items > 0 and actual_items != expected_items:
+            data["_item_count_mismatch"] = {
+                "expected": expected_items,
+                "actual": actual_items,
+            }
+
         if client_name:
             data["client_name"] = client_name
 

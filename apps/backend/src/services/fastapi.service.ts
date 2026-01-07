@@ -10,7 +10,7 @@ const FASTAPI_BASE_URL = (process.env.FASTAPI_URL || 'http://localhost:8000').re
 export const fastapiService = {
   async extractPurchaseOrder(
     file: Express.Multer.File,
-    options?: { clientName?: string; mappingText?: string },
+    options?: { clientName?: string; mappingText?: string; expectedItems?: number },
   ): Promise<ExtractedPOResponse> {
     const formData = new FormData();
     formData.append('file', file.buffer, {
@@ -24,6 +24,9 @@ export const fastapiService = {
     }
     if (options?.mappingText) {
       formData.append('mapping_text', options.mappingText);
+    }
+    if (typeof options?.expectedItems === 'number' && Number.isInteger(options.expectedItems) && options.expectedItems > 0) {
+      formData.append('expected_items', String(options.expectedItems));
     }
 
     const timeout = Number(process.env.FASTAPI_TIMEOUT_MS || 600000); // Default 10 minutes (600000ms)
