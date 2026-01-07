@@ -438,31 +438,23 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
 
     const xlsx = await import("xlsx");
 
-    const exportRows = completedItems.map((item) => {
-      const normalizeDate = (value: POItem["DeadlineDate"]) => {
-        if (!value) return "";
-        const d = typeof value === "string" ? new Date(value) : new Date(value);
-        return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
-      };
-
+    const exportRows = completedItems.map((item, index) => {
       return {
-        VendorStyleCode: item.VendorStyleCode ?? "",
-        ItemRefNo: item.ItemRefNo ?? "",
-        ItemPoNo: item.ItemPoNo ?? "",
-        OrderQty: item.OrderQty ?? 0,
-        Metal: item.Metal ?? "",
-        Tone: item.Tone ?? "",
-        Category: item.Category ?? "",
-        StockType: item.StockType ?? "",
-        MakeType: item.MakeType ?? "",
-        CustomerProductionInstruction: item.CustomerProductionInstruction ?? "",
-        SpecialRemarks: item.SpecialRemarks ?? "",
-        DesignProductionInstruction: item.DesignProductionInstruction ?? "",
-        StampInstruction: item.StampInstruction ?? "",
-        ItemSize: item.ItemSize ?? "",
-        DeadlineDate: normalizeDate(item.DeadlineDate),
-        ShippingDate: normalizeDate(item.ShippingDate),
-        InvoiceNumber: "", // Always empty
+        "SrNo.": index + 1,
+        "StyleCode": item.VendorStyleCode ?? "",
+        "ItemSize": item.ItemSize ?? "",
+        "OrderQty": item.OrderQty ?? 0,
+        "OrderItemPcs": "", // Not in data model - left empty
+        "Metal": item.Metal ?? "",
+        "Tone": item.Tone ?? "",
+        "ItemPoNo": item.ItemPoNo ?? "",
+        "ItemRefNo": item.ItemRefNo ?? "",
+        "StockType": item.StockType ?? "",
+        "MakeType": item.MakeType ?? "",
+        "CustomerProductionInstruction": item.CustomerProductionInstruction ?? "",
+        "SpecialRemarks": item.SpecialRemarks ?? "",
+        "DesignProductionInstruction": item.DesignProductionInstruction ?? "",
+        "StampInstruction": item.StampInstruction ?? "",
       };
     });
 
