@@ -183,7 +183,7 @@ function DashboardPage() {
         minWidth: 120,
         valueFormatter: (p: ValueFormatterParams<PurchaseOrder, number>) => {
           if (p.value == null) return "";
-          return `₹${Number(p.value).toLocaleString("en-IN")}`;
+          return `$${Number(p.value).toLocaleString("en-US")}`;
         },
       },
       { 
