@@ -9,6 +9,7 @@ export interface User {
   email: string;
   role: "admin" | "client";
   name: string;
+  username?: string | null;
   clientId?: string | null;
   clientName?: string | null;
 }

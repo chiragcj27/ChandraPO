@@ -20,6 +20,8 @@ export interface POItem {
   ShippingDate?: Date | string | null;
   InvoiceNumber: string;
   ExportedToExcel?: boolean;
+  CompletedBy?: string | null; // User ID who marked as complete
+  CompletedByName?: string | null; // User name/username who marked as complete
 }
 
 export interface PurchaseOrder {

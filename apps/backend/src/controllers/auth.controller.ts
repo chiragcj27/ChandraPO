@@ -81,6 +81,7 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response): 
       email: user.email,
       role: user.role,
       name: user.name || user.email,
+      username: user.username || null,
       clientId: user.clientId 
         ? (typeof user.clientId === 'object' && '_id' in user.clientId 
           ? user.clientId._id.toString() 
@@ -198,6 +199,7 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<v
       email: user.email,
       role: user.role,
       name: user.name || user.email,
+      username: user.username || null,
       clientId: user.clientId 
         ? (typeof user.clientId === 'object' && '_id' in user.clientId 
           ? user.clientId._id.toString() 

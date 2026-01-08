@@ -20,6 +20,7 @@ export interface POItemInterface {
     shippingDate?: Date | null;
     invoiceNumber: string;
     exportedToExcel: boolean;
+    completedBy?: mongoose.Types.ObjectId | null; // Reference to User who marked as complete
 }
 
 export const poItemSchema = new mongoose.Schema<POItemInterface>({
@@ -42,6 +43,7 @@ export const poItemSchema = new mongoose.Schema<POItemInterface>({
     shippingDate: { type: Date, default: null },
     invoiceNumber: { type: String, required: true, default: "" },
     exportedToExcel: { type: Boolean, required: true, default: false },
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 }, {
     timestamps: true,
 })

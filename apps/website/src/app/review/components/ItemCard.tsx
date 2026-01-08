@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { POItem } from "@/types/po";
 
 interface ItemCardProps {
@@ -27,6 +28,43 @@ export default function ItemCard({
   onCancelNewItem,
   readOnly = false,
 }: ItemCardProps) {
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const toggleButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Close dialog when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dialogRef.current &&
+        !dialogRef.current.contains(event.target as Node) &&
+        toggleButtonRef.current &&
+        !toggleButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowCompleteDialog(false);
+      }
+    };
+
+    if (showCompleteDialog) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [showCompleteDialog]);
+
+  const handleToggleClick = () => {
+    setShowCompleteDialog(true);
+  };
+
+  const handleConfirmComplete = () => {
+    onToggleIncomplete(index);
+    setShowCompleteDialog(false);
+  };
+
+  const handleCancelComplete = () => {
+    setShowCompleteDialog(false);
+  };
   // Helper function to check if a field is empty/null
   const isFieldEmpty = (value: string | number | null | undefined): boolean => {
     if (value === null || value === undefined) return true;
@@ -70,10 +108,11 @@ export default function ItemCard({
           <div className="flex items-center gap-3">
             {!isNewItem && (
               <>
-                <label className="flex items-center gap-3 cursor-pointer">
+                <label className="flex items-center gap-3 cursor-pointer relative">
                   <span className="text-sm font-medium text-slate-700">Mark as Complete</span>
                   <button
-                    onClick={() => onToggleIncomplete(index)}
+                    ref={toggleButtonRef}
+                    onClick={handleToggleClick}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-inner ${
                       item.IsIncomplete ? "bg-slate-300" : "bg-green-500"
                     }`}
@@ -86,6 +125,44 @@ export default function ItemCard({
                       }`}
                     />
                   </button>
+                  {showCompleteDialog && (
+                    <div
+                      ref={dialogRef}
+                      className="absolute top-full right-0 mt-2 z-50 bg-white rounded-lg shadow-xl border border-slate-200 p-4 min-w-[280px]"
+                    >
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                            {item.IsIncomplete ? "Mark as Complete?" : "Mark as Incomplete?"}
+                          </h3>
+                          <p className="text-xs text-slate-600">
+                            {item.IsIncomplete
+                              ? "Are you sure you want to mark this item as complete?"
+                              : "Are you sure you want to mark this item as incomplete?"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={handleCancelComplete}
+                          className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleConfirmComplete}
+                          className="px-3 py-1.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors text-sm"
+                        >
+                          Confirm
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </label>
                 {onDeleteItem && (
                   <button
@@ -427,6 +504,17 @@ export default function ItemCard({
           </svg>
           <p className="text-sm text-red-800 font-medium">
             This item is marked as incomplete. Please fill in all required fields.
+          </p>
+        </div>
+      )}
+
+      {!item.IsIncomplete && !isNewItem && (
+        <div className="mt-5 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+          <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-green-800 font-medium">
+            Completed by: <span className="font-semibold">{item.CompletedByName || "admin"}</span>
           </p>
         </div>
       )}

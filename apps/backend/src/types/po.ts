@@ -92,6 +92,7 @@ export interface POItemRecord {
   shippingDate?: Date | null;
   invoiceNumber: string;
   exportedToExcel: boolean;
+  completedBy?: string | null; // User ID who marked as complete
 }
 
 export interface PODocumentShape {
@@ -130,6 +131,8 @@ export interface PurchaseOrderItemDTO {
   ShippingDate?: string | null;
   InvoiceNumber: string;
   ExportedToExcel?: boolean;
+  CompletedBy?: string | null; // User ID who marked as complete
+  CompletedByName?: string | null; // User name/username who marked as complete
 }
 
 export interface PurchaseOrderDTO {

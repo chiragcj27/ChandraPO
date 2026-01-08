@@ -8,6 +8,7 @@ export interface User {
   role: UserRole;
   clientId?: mongoose.Types.ObjectId | null; // Reference to Client for client users
   name?: string; // Optional display name
+  username?: string; // Optional username
   isActive?: boolean; // For soft deletion/activation
 }
 
@@ -18,6 +19,7 @@ const userSchema = new mongoose.Schema<User>(
     role: { type: String, enum: ["admin", "client"], required: true },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", default: null },
     name: { type: String, trim: true },
+    username: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
   },
   {
