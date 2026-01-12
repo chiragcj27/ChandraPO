@@ -320,6 +320,18 @@ const normalizeStockType = (value: string | null | undefined): string | null => 
   return match || null;
 };
 
+const normalizeCategory = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.trim();
+  const categories = ['Ring', 'Band', 'Pendant', 'Necklace', 'Bracelet'];
+  // Exact match first
+  if (categories.includes(normalized)) return normalized;
+  // Case-insensitive match
+  const upperNormalized = normalized.toUpperCase();
+  const match = categories.find(cat => cat.toUpperCase() === upperNormalized);
+  return match || ''; // Return empty string if no match found, so dropdown shows "Select category"
+};
+
 const normalizeMakeType = (value: string | null | undefined): string | null => {
   if (!value) return null;
   const normalized = value.trim();
@@ -339,7 +351,7 @@ const mapExtractionLineToRecord = (line: ExtractedLine, invoiceNumber?: string):
   orderQty: Number(line.OrderQty) || 0,
   metal: normalizeMetal(line.Metal),
   tone: normalizeTone(line.Tone),
-  category: (line.Category || '').trim(),
+  category: normalizeCategory(line.Category),
   stockType: normalizeStockType(line.StockType),
   makeType: normalizeMakeType(line.MakeType),
   customerProductionInstruction: line.CustomerProductionInstruction ? line.CustomerProductionInstruction.trim() : null,

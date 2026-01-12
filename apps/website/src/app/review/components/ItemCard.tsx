@@ -296,16 +296,21 @@ export default function ItemCard({
           <label className="block text-sm font-semibold text-slate-700 mb-2">
             Category
           </label>
-          <input
-            type="text"
+          <select
             value={item.Category || ""}
             disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, { ...item, Category: e.target.value })
             }
-            className={getInputClassName(item.Category, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
-            placeholder="Enter category"
-          />
+            className={getInputClassName(item.Category, "w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900")}
+          >
+            <option value="">Select category</option>
+            <option value="Ring">Ring</option>
+            <option value="Band">Band</option>
+            <option value="Pendant">Pendant</option>
+            <option value="Necklace">Necklace</option>
+            <option value="Bracelet">Bracelet</option>
+          </select>
         </div>
 
         <div>
@@ -347,28 +352,6 @@ export default function ItemCard({
             <option value="Studded Semi Mount Platinum Jewellery IC">Studded Semi Mount Platinum Jewellery IC</option>
             <option value="Gold Mount Jewellery IC">Gold Mount Jewellery IC</option>
             <option value="Studded Combination Jewellery IC">Studded Combination Jewellery IC</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Make Type
-          </label>
-          <select
-            value={item.MakeType || ""}
-            disabled={readOnly}
-            onChange={(e) =>
-              onUpdateItem(index, { ...item, MakeType: e.target.value || null })
-            }
-            className={getInputClassName(item.MakeType, "w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900")}
-          >
-            <option value="">Select make type</option>
-            <option value="CNC">CNC</option>
-            <option value="HOLLOW TUBING">HOLLOW TUBING</option>
-            <option value="1 PC CAST">1 PC CAST</option>
-            <option value="2 PC CAST">2 PC CAST</option>
-            <option value="MULTI CAST">MULTI CAST</option>
-            <option value="HIP HOP">HIP HOP</option>
           </select>
         </div>
 

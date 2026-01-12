@@ -351,7 +351,6 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     { key: "Category", label: "Category" },
     { key: "OrderQty", label: "Order Quantity" },
     { key: "StockType", label: "Stock Type" },
-    { key: "MakeType", label: "Make Type" },
     { key: "ItemSize", label: "Item Size" },
     { key: "DeadlineDate", label: "Deadline Date" },
     { key: "ShippingDate", label: "Shipping Date" },
@@ -438,27 +437,76 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
 
     const xlsx = await import("xlsx");
 
+    // Define column order as specified
+    const columnOrder = [
+      "SrNo",
+      "StyleCode",
+      "ItemSize",
+      "OrderQty",
+      "OrderItemPcs",
+      "Metal",
+      "Tone",
+      "ItemPoNo",
+      "ItemRefNo",
+      "StockType",
+      "MakeType",
+      "CustomerProductionInstruction",
+      "SpecialRemarks",
+      "DesignProductionInstruction",
+      "StampInstruction",
+      "OrderGroup",
+      "Certificate",
+      "SKUNo",
+      "Basestoneminwt",
+      "Basestonemaxwt",
+      "Basemetalminwt",
+      "Basemetalmaxwt",
+      "Productiondeliverydate",
+      "Expecteddeliverydate",
+      "", // Empty column
+      "SetPrice",
+      "StoneQuality"
+    ];
+
     const exportRows = completedItems.map((item, index) => {
-      return {
-        "SrNo.": index + 1,
-        "StyleCode": item.VendorStyleCode ?? "",
-        "ItemSize": item.ItemSize ?? "",
-        "OrderQty": item.OrderQty ?? 0,
-        "OrderItemPcs": "", // Not in data model - left empty
-        "Metal": item.Metal ?? "",
-        "Tone": item.Tone ?? "",
-        "ItemPoNo": item.ItemPoNo ?? "",
-        "ItemRefNo": item.ItemRefNo ?? "",
-        "StockType": item.StockType ?? "",
-        "MakeType": item.MakeType ?? "",
-        "CustomerProductionInstruction": item.CustomerProductionInstruction ?? "",
-        "SpecialRemarks": item.SpecialRemarks ?? "",
-        "DesignProductionInstruction": item.DesignProductionInstruction ?? "",
-        "StampInstruction": item.StampInstruction ?? "",
-      };
+      // Create row data in the exact column order
+      const rowData: (string | number)[] = [
+        index + 1, // SrNo
+        item.VendorStyleCode ?? "", // StyleCode
+        item.ItemSize ?? "", // ItemSize
+        item.OrderQty ?? 0, // OrderQty
+        1, // OrderItemPcs - Default value 1
+        item.Metal ?? "", // Metal
+        item.Tone ?? "", // Tone
+        item.ItemPoNo ?? "", // ItemPoNo
+        item.ItemRefNo ?? "", // ItemRefNo
+        item.StockType ?? "", // StockType
+        "", // MakeType - Always blank
+        item.CustomerProductionInstruction ?? "", // CustomerProductionInstruction
+        item.SpecialRemarks ?? "", // SpecialRemarks
+        item.DesignProductionInstruction ?? "", // DesignProductionInstruction
+        item.StampInstruction ?? "", // StampInstruction
+        "", // OrderGroup - Not in data model
+        "", // Certificate - Not in data model
+        "", // SKUNo - Not in data model
+        "", // Basestoneminwt - Not in data model
+        "", // Basestonemaxwt - Not in data model
+        "", // Basemetalminwt - Not in data model
+        "", // Basemetalmaxwt - Not in data model
+        "", // Productiondeliverydate - Not in data model
+        "", // Expecteddeliverydate - Not in data model
+        "", // Empty column
+        "", // SetPrice - Not in data model
+        "", // StoneQuality - Not in data model
+      ];
+      return rowData;
     });
 
-    const worksheet = xlsx.utils.json_to_sheet(exportRows);
+    // Create worksheet with headers and data in correct order
+    const worksheet = xlsx.utils.aoa_to_sheet([
+      columnOrder, // Header row
+      ...exportRows // Data rows
+    ]);
     const workbook = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(workbook, worksheet, "Completed Items");
 
