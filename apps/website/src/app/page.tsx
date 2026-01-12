@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type {
   ColDef,
@@ -8,8 +8,6 @@ import type {
   ICellRendererParams,
   GridApi,
   GridReadyEvent,
-  IDatasource,
-  IGetRowsParams,
 } from "ag-grid-community";
 import type { PurchaseOrder } from "../types/po";
 import { useRouter } from "next/navigation";
@@ -31,6 +29,8 @@ type ClientRecord = {
 function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const gridApiRef = useRef<GridApi<PurchaseOrder> | null>(null);
+  const [rowData, setRowData] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deletingPO, setDeletingPO] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ poNumber: string; clientName: string } | null>(null);
@@ -157,6 +157,22 @@ function DashboardPage() {
     [],
   );
 
+  const TotalValueCellRenderer = useCallback(
+    (params: ICellRendererParams<PurchaseOrder, number>) => {
+      const value = params.value;
+      if (value == null) return <span></span>;
+      
+      return (
+        <div className="flex items-center justify-end h-full pr-2">
+          <span className="font-medium">
+            ${Number(value).toLocaleString("en-US")}
+          </span>
+        </div>
+      );
+    },
+    [],
+  );
+
   const columnDefs = useMemo<ColDef<PurchaseOrder>[]>(
     () => [
       { 
@@ -208,10 +224,7 @@ function DashboardPage() {
         sortable: true,
         width: 140,
         minWidth: 120,
-        valueFormatter: (p: ValueFormatterParams<PurchaseOrder, number>) => {
-          if (p.value == null) return "";
-          return `$${Number(p.value).toLocaleString("en-US")}`;
-        },
+        cellRenderer: TotalValueCellRenderer,
       },
       { 
         headerName: "Status", 
@@ -255,53 +268,55 @@ function DashboardPage() {
         cellRenderer: DeleteCellRenderer,
       } as ColDef<PurchaseOrder>] : []),
     ],
-    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, PONumberCellRenderer, isAdmin]
+    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, PONumberCellRenderer, TotalValueCellRenderer, isAdmin]
   );
 
-  const createDataSource = useCallback(
-    (): IDatasource => ({
-      getRows: async (params: IGetRowsParams) => {
-        const { startRow, endRow } = params;
-        try {
-          const res = await authenticatedFetch(
-            `/po?startRow=${startRow}&endRow=${endRow}`,
-          );
-          if (!res.ok) {
-            throw new Error("Failed to load purchase orders");
-          }
-          const payload = await res.json();
-          const rows: PurchaseOrder[] = Array.isArray(payload)
-            ? payload
-            : payload?.rowData || payload?.data || [];
-          const totalRowCount =
-            typeof payload?.rowCount === "number"
-              ? payload.rowCount
-              : rows.length;
+  const fetchPOs = useCallback(async () => {
+    setLoading(true);
+    try {
+      // First, get the total count by fetching a small batch
+      const countRes = await authenticatedFetch(`/po?startRow=0&endRow=1`);
+      if (!countRes.ok) {
+        throw new Error("Failed to load purchase orders");
+      }
+      const countPayload = await countRes.json();
+      const totalCount = typeof countPayload?.rowCount === "number"
+        ? countPayload.rowCount
+        : 0;
 
-          params.successCallback(rows, totalRowCount);
-        } catch (error) {
-          console.error("Failed to fetch purchase orders", error);
-          params.failCallback();
-        }
-      },
-    }),
-    [],
-  );
-
-  const refreshGrid = useCallback(() => {
-    if (gridApiRef.current) {
-      gridApiRef.current.purgeInfiniteCache();
+      // Fetch all data
+      const res = await authenticatedFetch(`/po?startRow=0&endRow=${Math.max(totalCount, 1000)}`);
+      if (!res.ok) {
+        throw new Error("Failed to load purchase orders");
+      }
+      const payload = await res.json();
+      const rows: PurchaseOrder[] = Array.isArray(payload)
+        ? payload
+        : payload?.rowData || payload?.data || [];
+      setRowData(rows);
+    } catch (error) {
+      console.error("Failed to fetch purchase orders", error);
+      setRowData([]);
+    } finally {
+      setLoading(false);
     }
   }, []);
+
+  const refreshGrid = useCallback(() => {
+    void fetchPOs();
+  }, [fetchPOs]);
 
   const onGridReady = useCallback(
     (params: GridReadyEvent<PurchaseOrder>) => {
       gridApiRef.current = params.api;
-      // Set datasource using setGridOption for infinite row model
-      params.api.setGridOption('datasource', createDataSource());
     },
-    [createDataSource],
+    [],
   );
+
+  // Fetch data on mount
+  useEffect(() => {
+    void fetchPOs();
+  }, [fetchPOs]);
 
   const loadClients = async () => {
     setClientLoading(true);
@@ -630,11 +645,13 @@ function DashboardPage() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="ag-theme-quartz w-full h-[calc(100vh-200px)] min-h-[600px]">
             <AgGridReact<PurchaseOrder>
+              rowData={rowData}
               columnDefs={columnDefs}
               animateRows
-              rowModelType="infinite"
-              cacheBlockSize={50}
-              maxBlocksInCache={2}
+              loading={loading}
+              pagination={true}
+              paginationPageSize={25}
+              paginationPageSizeSelector={[10, 25, 50, 100]}
               rowHeight={56}
               headerHeight={56}
               suppressHorizontalScroll={false}

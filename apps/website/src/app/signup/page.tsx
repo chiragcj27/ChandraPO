@@ -5,12 +5,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-export default function LoginPage() {
+export default function SignupPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [secretCode, setSecretCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { signup, isAuthenticated } = useAuth();
   const router = useRouter();
 
   // Redirect if already authenticated
@@ -26,10 +28,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      // Navigation is handled by the login function
+      await signup(name, email, password, secretCode);
+      // Navigation is handled by the signup function
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
+      setError(err instanceof Error ? err.message : "Signup failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -40,7 +42,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg border border-slate-200 p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">ChandraPO</h1>
-          <p className="text-slate-600">Sign in to your account</p>
+          <p className="text-slate-600">Create an admin account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -49,6 +51,22 @@ export default function LoginPage() {
               {error}
             </div>
           )}
+
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
+              Full Name
+            </label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+              placeholder="John Doe"
+              disabled={loading}
+            />
+          </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
@@ -76,10 +94,30 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
               placeholder="••••••••"
               disabled={loading}
             />
+            <p className="mt-1 text-xs text-slate-500">Must be at least 6 characters</p>
+          </div>
+
+          <div>
+            <label htmlFor="secretCode" className="block text-sm font-medium text-slate-700 mb-2">
+              Chandra Secret Code
+            </label>
+            <input
+              id="secretCode"
+              type="text"
+              value={secretCode}
+              onChange={(e) => setSecretCode(e.target.value)}
+              required
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+              placeholder="Enter 6-digit secret code"
+              disabled={loading}
+              maxLength={6}
+            />
+            <p className="mt-1 text-xs text-slate-500">6-digit code known in your organization</p>
           </div>
 
           <button
@@ -109,19 +147,19 @@ export default function LoginPage() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Signing in...
+                Creating account...
               </span>
             ) : (
-              "Sign in"
+              "Create Admin Account"
             )}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-slate-600">
           <p>
-            Need an account?{" "}
-            <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-              Create admin account
+            Already have an account?{" "}
+            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+              Sign in
             </Link>
           </p>
         </div>
@@ -129,5 +167,4 @@ export default function LoginPage() {
     </div>
   );
 }
-
 

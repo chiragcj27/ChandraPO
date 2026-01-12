@@ -19,6 +19,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, secretCode: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -116,6 +117,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signup = async (name: string, email: string, password: string, secretCode: string) => {
+    try {
+      const response = await fetch(getApiEndpoint("/auth/admin-signup"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name, email, password, secretCode }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Signup failed");
+      }
+
+      const data = await response.json();
+      setToken(data.token);
+      setUser(data.user);
+      localStorage.setItem("auth_token", data.token);
+      localStorage.setItem("auth_user", JSON.stringify(data.user));
+      router.push("/");
+    } catch (error) {
+      console.error("Signup error:", error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
@@ -129,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     token,
     loading,
     login,
+    signup,
     logout,
     isAuthenticated: !!user && !!token,
     isAdmin: user?.role === "admin",

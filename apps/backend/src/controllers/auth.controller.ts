@@ -19,6 +19,13 @@ interface RegisterRequest {
   name?: string;
 }
 
+interface AdminSignupRequest {
+  name: string;
+  email: string;
+  password: string;
+  secretCode: string;
+}
+
 /**
  * Generate JWT token for user
  */
@@ -179,6 +186,89 @@ export const register = async (req: Request<{}, {}, RegisterRequest>, res: Respo
 };
 
 /**
+ * Admin signup endpoint
+ * Requires a secret code to create admin accounts
+ */
+export const adminSignup = async (req: Request<{}, {}, AdminSignupRequest>, res: Response): Promise<void> => {
+  try {
+    const { name, email, password, secretCode } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !password || !secretCode) {
+      res.status(400).json({ message: 'Name, email, password, and secret code are required' });
+      return;
+    }
+
+    // Validate secret code from environment variable
+    const CHANDRA_SECRET_CODE = process.env.CHANDRA_SECRET_CODE;
+    if (!CHANDRA_SECRET_CODE) {
+      console.error('CHANDRA_SECRET_CODE is not configured in environment variables');
+      res.status(500).json({ message: 'Server configuration error' });
+      return;
+    }
+
+    // Verify secret code (trim whitespace and compare)
+    if (secretCode.trim() !== CHANDRA_SECRET_CODE.trim()) {
+      res.status(403).json({ message: 'Invalid secret code' });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ message: 'Invalid email format' });
+      return;
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      res.status(400).json({ message: 'Password must be at least 6 characters long' });
+      return;
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+    if (existingUser) {
+      res.status(400).json({ message: 'User with this email already exists' });
+      return;
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create admin user
+    const user = await User.create({
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+      role: 'admin',
+      name: name.trim(),
+      isActive: true,
+    });
+
+    // Generate token
+    const token = generateToken(user);
+
+    // Return user info (without password) and token
+    const userResponse: any = {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      name: user.name || user.email,
+      clientId: null,
+    };
+
+    res.status(201).json({
+      token,
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error('Admin signup error:', error);
+    res.status(500).json({ message: 'Registration failed' });
+  }
+};
+
+/**
  * Get current user endpoint
  */
 export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -217,6 +307,6 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-export default { login, register, getCurrentUser };
+export default { login, register, adminSignup, getCurrentUser };
 
 
