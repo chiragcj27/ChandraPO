@@ -4,7 +4,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PurchaseOrder, POItem } from "@/types/po";
-import { getApiEndpoint } from "@/lib/api";
+import { authenticatedFetch } from "@/lib/api";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
 
@@ -46,7 +46,7 @@ export default function CompletedItemsPage({ params }: { params: Promise<{ poNum
         
         // Try to fetch from API first
         try {
-          const res = await fetch(getApiEndpoint(`/po/${decodedPoNumber}`));
+          const res = await authenticatedFetch(`/po/${decodedPoNumber}`);
           if (res.ok) {
             const data: PurchaseOrder = await res.json();
             setPo(data);
@@ -55,6 +55,10 @@ export default function CompletedItemsPage({ params }: { params: Promise<{ poNum
             setItems(allItems);
             setLoading(false);
             return;
+          } else {
+            // If API returns an error, log it but continue to mock data fallback
+            const errorText = await res.text();
+            console.warn("API fetch failed with status:", res.status, errorText);
           }
         } catch (apiError) {
           console.warn("API fetch failed, trying mock data:", apiError);

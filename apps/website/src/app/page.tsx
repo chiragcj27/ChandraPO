@@ -54,6 +54,32 @@ function DashboardPage() {
   const router = useRouter();
   const { isAdmin, user, logout } = useAuth();
 
+  const PONumberCellRenderer = useCallback(
+    (params: ICellRendererParams<PurchaseOrder, string>) => {
+      const poNumber = params.value;
+      if (!poNumber) return <span></span>;
+      
+      const onClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (poNumber) {
+          router.push(`/po/${encodeURIComponent(poNumber)}/items`);
+        }
+      };
+      
+      return (
+        <div 
+          onClick={onClick}
+          className="text-blue-600 hover:text-blue-800 hover:underline font-medium transition-colors cursor-pointer h-full flex items-center"
+          style={{ cursor: 'pointer' }}
+        >
+          {poNumber}
+        </div>
+      );
+    },
+    [router],
+  );
+
   const ActionCellRenderer = useCallback(
     (params: ICellRendererParams<PurchaseOrder, string>) => {
       const poNumber = params.data?.PONumber;
@@ -141,6 +167,7 @@ function DashboardPage() {
         width: 150,
         minWidth: 120,
         tooltipValueGetter: (params) => params.value,
+        cellRenderer: PONumberCellRenderer,
       },
       { 
         headerName: "PO Date", 
@@ -228,7 +255,7 @@ function DashboardPage() {
         cellRenderer: DeleteCellRenderer,
       } as ColDef<PurchaseOrder>] : []),
     ],
-    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, isAdmin]
+    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, PONumberCellRenderer, isAdmin]
   );
 
   const createDataSource = useCallback(
