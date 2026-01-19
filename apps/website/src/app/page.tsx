@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { authenticatedFetch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import DropdownFilter from "@/components/DropdownFilter";
 
 // AG Grid styles
 import "ag-grid-community/styles/ag-grid.css";
@@ -51,6 +52,7 @@ function DashboardPage() {
     message: string;
     error?: string;
   } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
   const { isAdmin, user, logout } = useAuth();
 
@@ -188,8 +190,7 @@ function DashboardPage() {
       { 
         headerName: "PO Date", 
         field: "PODate", 
-        sortable: true, 
-        filter: true,
+        sortable: true,
         width: 120,
         minWidth: 100,
       },
@@ -197,7 +198,10 @@ function DashboardPage() {
         headerName: "Client Name", 
         field: "ClientName", 
         sortable: true, 
-        filter: true,
+        filter: DropdownFilter,
+        filterParams: {
+          values: clients.map(c => c.name).sort(),
+        },
         width: 180,
         minWidth: 150,
         flex: 1,
@@ -230,7 +234,10 @@ function DashboardPage() {
         headerName: "Status", 
         field: "Status", 
         sortable: true, 
-        filter: true,
+        filter: DropdownFilter,
+        filterParams: {
+          values: ['New', 'In Review', 'Reviewed', 'Reviewed & Incomplete', 'Completed', 'Cancelled'],
+        },
         width: 160,
         minWidth: 140,
         cellRenderer: StatusCellRenderer,
@@ -268,7 +275,7 @@ function DashboardPage() {
         cellRenderer: DeleteCellRenderer,
       } as ColDef<PurchaseOrder>] : []),
     ],
-    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, PONumberCellRenderer, TotalValueCellRenderer, isAdmin]
+    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, PONumberCellRenderer, TotalValueCellRenderer, isAdmin, clients]
   );
 
   const fetchPOs = useCallback(async () => {
@@ -313,9 +320,23 @@ function DashboardPage() {
     [],
   );
 
+  // Filter rowData based on search query
+  const filteredRowData = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return rowData;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return rowData.filter((po) => {
+      const poNumber = po.PONumber?.toLowerCase() || "";
+      const clientName = po.ClientName?.toLowerCase() || "";
+      return poNumber.includes(query) || clientName.includes(query);
+    });
+  }, [rowData, searchQuery]);
+
   // Fetch data on mount
   useEffect(() => {
     void fetchPOs();
+    void loadClients();
   }, [fetchPOs]);
 
   const loadClients = async () => {
@@ -587,15 +608,24 @@ function DashboardPage() {
             </h1>
             <p className="text-sm text-slate-600 mt-1">
               Purchase Order Management System
-              {user && (
-                <span className="ml-2 text-xs text-slate-500">
-                  • {user.name} ({user.role})
-                  {user.clientName && ` • ${user.clientName}`}
-                </span>
-              )}
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {user && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 border border-slate-200">
+                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span className="text-sm font-medium text-slate-700">
+                  {user.name}
+                </span>
+                {user.clientName && (
+                  <span className="text-xs text-slate-500">
+                    ({user.clientName})
+                  </span>
+                )}
+              </div>
+            )}
             {isAdmin && (
               <>
                 <input
@@ -641,11 +671,38 @@ function DashboardPage() {
           </div>
         </header>
 
+        {/* Search Bar */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div className="flex items-center gap-3">
+            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search by PO number or client name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="px-3 py-2 text-slate-500 hover:text-slate-700 transition-colors"
+                aria-label="Clear search"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Data Grid */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="ag-theme-quartz w-full h-[calc(100vh-200px)] min-h-[600px]">
+          <div className="ag-theme-quartz w-full h-[calc(100vh-280px)] min-h-[600px]">
             <AgGridReact<PurchaseOrder>
-              rowData={rowData}
+              rowData={filteredRowData}
               columnDefs={columnDefs}
               animateRows
               loading={loading}

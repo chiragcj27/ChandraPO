@@ -23,6 +23,7 @@ router.get('/', poController.getPOs);
 router.get('/clients', requireAdmin, clientController.listClients);
 router.post('/clients', requireAdmin, clientController.upsertClient);
 router.get('/:poNumber/pdf', poController.streamPOPdf);
+router.get('/:poNumber/items', poController.getPOItems); // Optimized endpoint for items page
 router.get('/:poNumber', poController.getPOByNumber);
 // Update PO - admin only (clients have view-only access)
 router.put('/:poNumber', requireAdmin, poController.updatePO);
