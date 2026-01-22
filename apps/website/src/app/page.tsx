@@ -395,8 +395,8 @@ function DashboardPage() {
   };
 
   const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
     if (!pendingClientSelection) {
       alert("Select a client before uploading.");
       return;
@@ -412,12 +412,13 @@ function DashboardPage() {
     }
     
     setUploading(true);
+    const fileCount = files.length;
     setUploadProgress({
       stage: 'uploading',
-      message: 'Uploading file to server...',
+      message: `Uploading ${fileCount} file${fileCount > 1 ? 's' : ''} to server...`,
     });
 
-    try {
+    const uploadSingleFile = async (file: File) => {
       const form = new FormData();
       form.append("file", file);
       form.append("clientName", pendingClientSelection.clientName);
@@ -426,70 +427,46 @@ function DashboardPage() {
       if (expectedItems.trim()) {
         form.append("expectedItems", expectedItems.trim());
       }
-      
-      setUploadProgress({
-        stage: 'extracting',
-        message: 'Processing document extraction... This may take a minute.',
-      });
 
       const res = await authenticatedFetch("/po/upload", {
         method: "POST",
         body: form,
       });
-      
+
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: "Upload failed" }));
         const errorMessage = errorData.message || errorData.error || "Upload failed";
-        
-        // Check if it's a FastAPI error
-        if (errorMessage.includes('FastAPI') || errorMessage.includes('extraction')) {
-          setUploadProgress({
-            stage: 'error',
-            message: 'Extraction failed',
-            error: errorMessage,
-          });
-        } else {
-          setUploadProgress({
-            stage: 'error',
-            message: 'Upload failed',
-            error: errorMessage,
-          });
-        }
-        return;
+        throw new Error(errorMessage);
       }
-      
+
+      // We don't auto-navigate for each file; just ensure the PO list is refreshed after all uploads.
+      await res.json();
+    };
+
+    try {
       setUploadProgress({
-        stage: 'saving',
-        message: 'Saving purchase order...',
+        stage: 'extracting',
+        message: 'Processing document extraction for all files... This may take a minute.',
       });
 
-      const result = await res.json();
-      const poNumber = result.po?.PONumber || result.poNumber;
-      
+      await Promise.all(files.map((file) => uploadSingleFile(file)));
+
       setUploadProgress({
         stage: 'complete',
-        message: 'Upload successful!',
+        message: fileCount > 1 ? 'All POs uploaded successfully!' : 'Upload successful!',
       });
 
       // Small delay to show success message
       await new Promise(resolve => setTimeout(resolve, 500));
-      
-      if (poNumber) {
-        // Navigate to review page with the extracted PO data
-        router.push(`/review/${encodeURIComponent(poNumber)}`);
-      } else {
-        // Fallback: reload the list if PO number is not available
-        refreshGrid();
-        setUploadProgress(null);
-        alert("PO uploaded successfully");
-      }
+
+      // Refresh the grid to show newly uploaded POs
+      refreshGrid();
     } catch (err) {
       console.error("Upload error:", err);
       const errorMessage = err instanceof Error ? err.message : "Upload failed. Please try again.";
-      
-      // Check error type
+
       let errorDetail = errorMessage;
-      
+
       if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
         errorDetail = 'The extraction is taking longer than expected. The FastAPI service may be slow or unresponsive.';
       } else if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Cannot connect')) {
@@ -497,7 +474,7 @@ function DashboardPage() {
       } else if (errorMessage.includes('502') || errorMessage.includes('Bad Gateway')) {
         errorDetail = 'The extraction service returned an error. The FastAPI service may be down or overloaded.';
       }
-      
+
       setUploadProgress({
         stage: 'error',
         message: 'Upload failed',
@@ -631,6 +608,7 @@ function DashboardPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   accept="application/pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   onChange={handleFileChange}
                   className="hidden"

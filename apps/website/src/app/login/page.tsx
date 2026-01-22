@@ -117,13 +117,26 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-slate-600">
-          <p>
-            Need an account?{" "}
-            <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-              Create admin account
+        <div className="mt-6 space-y-3">
+          <div className="text-center">
+            <Link
+              href="/tracking"
+              className="inline-block w-full px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+              Track Shipments
             </Link>
-          </p>
+          </div>
+          <div className="text-center text-sm text-slate-600">
+            <p>
+              Need an account?{" "}
+              <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+                Create admin account
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

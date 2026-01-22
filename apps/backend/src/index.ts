@@ -4,7 +4,9 @@ import dotenv from 'dotenv';
 import { connectDB } from '@repo/db';
 import poRoutes from './routes/po.routes';
 import authRoutes from './routes/auth.routes';
+import trackingRoutes from './routes/tracking.routes';
 import { seedDefaultClients } from './seed/clients';
+import { startTrackingCronJob } from './services/tracking-cron.service';
 
 dotenv.config();
 
@@ -35,10 +37,14 @@ app.get('/', (_req, res) => {
 
 app.use('/auth', authRoutes);
 app.use('/po', poRoutes);
+app.use('/tracking', trackingRoutes);
 
 const startServer = async () => {
   await connectDB();
   await seedDefaultClients();
+
+  // Start tracking cron job
+  startTrackingCronJob();
 
   app.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
