@@ -58,7 +58,7 @@ const parseExcelFile = (buffer: Buffer): Array<{ trackingId: string; provider: s
 const fetchAndUpdateTracking = async (
   trackingId: string,
   provider: string
-): Promise<{ latestStatus: string; statusHistory: TrackingStatus[] }> => {
+): Promise<{ latestStatus: string; statusHistory: TrackingStatus[]; deliveryDate?: Date }> => {
   try {
     // For now, we only support Malca-Amit
     // In the future, you can add other providers here
@@ -75,6 +75,7 @@ const fetchAndUpdateTracking = async (
       return {
         latestStatus: statusHistory[0].status,
         statusHistory,
+        deliveryDate: (statusHistory as any).deliveryDate,
       };
     } else {
       // Unknown provider - return default
@@ -126,7 +127,7 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
         }
 
         // Fetch initial status from API
-        const { latestStatus, statusHistory } = await fetchAndUpdateTracking(trackingId, provider);
+        const { latestStatus, statusHistory, deliveryDate } = await fetchAndUpdateTracking(trackingId, provider);
 
         // Determine if tracking should be active
         const isActive = latestStatus.toLowerCase() !== 'delivered';
@@ -139,6 +140,7 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
           statusHistory,
           isActive,
           lastUpdated: new Date(),
+          deliveryDate,
         });
 
         results.added++;
@@ -176,6 +178,7 @@ export const getAllTrackings = async (req: Request, res: Response) => {
         statusHistory: t.statusHistory || [], // Include status history
         isActive: t.isActive,
         lastUpdated: t.lastUpdated,
+        deliveryDate: t.deliveryDate, // Include delivery date
         createdAt: t.createdAt || t._id?.getTimestamp?.() || new Date(),
         updatedAt: t.updatedAt || t._id?.getTimestamp?.() || new Date(),
       })),
@@ -207,6 +210,7 @@ export const getTrackingDetails = async (req: Request, res: Response) => {
       statusHistory: tracking.statusHistory,
       isActive: tracking.isActive,
       lastUpdated: tracking.lastUpdated,
+      deliveryDate: (tracking as any).deliveryDate,
       createdAt: (tracking as any).createdAt || new Date(),
       updatedAt: (tracking as any).updatedAt || new Date(),
     });
@@ -230,7 +234,7 @@ export const refreshTracking = async (req: Request, res: Response) => {
     }
 
     // Fetch latest status
-    const { latestStatus, statusHistory } = await fetchAndUpdateTracking(
+    const { latestStatus, statusHistory, deliveryDate } = await fetchAndUpdateTracking(
       tracking.trackingId,
       tracking.provider
     );
@@ -242,6 +246,9 @@ export const refreshTracking = async (req: Request, res: Response) => {
     tracking.statusHistory = statusHistory;
     tracking.isActive = isActive;
     tracking.lastUpdated = new Date();
+    if (deliveryDate) {
+      (tracking as any).deliveryDate = deliveryDate;
+    }
 
     await tracking.save();
 
@@ -255,6 +262,7 @@ export const refreshTracking = async (req: Request, res: Response) => {
         statusHistory: tracking.statusHistory,
         isActive: tracking.isActive,
         lastUpdated: tracking.lastUpdated,
+        deliveryDate: (tracking as any).deliveryDate,
       },
     });
   } catch (error: any) {
@@ -263,10 +271,38 @@ export const refreshTracking = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Delete a tracking record
+ */
+export const deleteTracking = async (req: Request, res: Response) => {
+  try {
+    const { trackingId } = req.params;
+
+    const tracking = await Tracking.findOneAndDelete({ trackingId });
+
+    if (!tracking) {
+      return res.status(404).json({ message: 'Tracking not found' });
+    }
+
+    res.status(200).json({
+      message: 'Tracking deleted successfully',
+      deletedTracking: {
+        id: tracking._id,
+        trackingId: tracking.trackingId,
+        provider: tracking.provider,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error deleting tracking:', error);
+    res.status(500).json({ message: 'Failed to delete tracking', error: error.message });
+  }
+};
+
 export default {
   uploadTrackingExcel,
   getAllTrackings,
   getTrackingDetails,
   refreshTracking,
+  deleteTracking,
 };
 

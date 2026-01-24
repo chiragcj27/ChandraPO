@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 export interface TrackingStatus {
   status: string;
   timestamp: Date;
-  location?: string;
   description?: string;
 }
 
@@ -14,12 +13,12 @@ export interface Tracking {
   statusHistory: TrackingStatus[];
   isActive: boolean; // Stop tracking when delivered
   lastUpdated: Date;
+  deliveryDate?: Date; // Expected/estimated delivery date
 }
 
 const trackingStatusSchema = new mongoose.Schema<TrackingStatus>({
   status: { type: String, required: true },
   timestamp: { type: Date, required: true, default: Date.now },
-  location: { type: String },
   description: { type: String },
 }, { _id: false });
 
@@ -30,6 +29,7 @@ const trackingSchema = new mongoose.Schema<Tracking>({
   statusHistory: { type: [trackingStatusSchema], default: [] },
   isActive: { type: Boolean, default: true, index: true },
   lastUpdated: { type: Date, default: Date.now },
+  deliveryDate: { type: Date },
 }, {
   timestamps: true,
 });

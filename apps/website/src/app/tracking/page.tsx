@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 interface TrackingStatus {
   status: string;
   timestamp: string;
-  location?: string;
   description?: string;
 }
 
@@ -20,6 +19,7 @@ interface Tracking {
   statusHistory: TrackingStatus[];
   isActive: boolean;
   lastUpdated: string;
+  deliveryDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,7 +29,9 @@ function TrackingPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [expandedOverdueSection, setExpandedOverdueSection] = useState(false);
   const [refreshing, setRefreshing] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -132,6 +134,33 @@ function TrackingPage() {
     }
   };
 
+  const deleteTracking = async (trackingId: string) => {
+    if (!window.confirm("Are you sure you want to delete this tracking record? This action cannot be undone.")) {
+      return;
+    }
+
+    setDeleting(trackingId);
+    try {
+      const res = await fetch(getApiEndpoint(`/tracking/${trackingId}`), {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Failed to delete tracking" }));
+        throw new Error(errorData.message || "Failed to delete tracking");
+      }
+
+      // Remove from local state
+      setTrackings((prev) => prev.filter((t) => t.trackingId !== trackingId));
+      alert("Tracking record deleted successfully");
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert(error instanceof Error ? error.message : "Failed to delete tracking");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const lowerStatus = status.toLowerCase();
     if (lowerStatus.includes("delivered")) {
@@ -157,13 +186,40 @@ function TrackingPage() {
     });
   };
 
+  const isOldDelivery = (tracking: Tracking): boolean => {
+    // Find the "Delivered" status in status history
+    const deliveredStatus = tracking.statusHistory.find((status) =>
+      status.status.toLowerCase().includes('delivered')
+    );
+    
+    // If no delivered status found, return false
+    if (!deliveredStatus) {
+      return false;
+    }
+    
+    // Check if delivery was more than 3 days ago based on the delivered status timestamp
+    const deliveredTime = new Date(deliveredStatus.timestamp);
+    const now = new Date();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    
+    return deliveredTime < threeDaysAgo;
+  };
+
+  const getOldDeliveries = () => {
+    return trackings.filter((t) => isOldDelivery(t));
+  };
+
+  const getActiveShipments = () => {
+    return trackings.filter((t) => !isOldDelivery(t));
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100">
       <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
         {/* Header */}
         <header className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               Shipment Tracking
             </h1>
             <p className="text-sm text-slate-600 mt-1">Track and monitor shipment statuses</p>
@@ -271,120 +327,317 @@ function TrackingPage() {
               <p className="text-slate-600">No trackings found. Upload an Excel file to get started.</p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-200">
-              {trackings.map((tracking) => {
-                const isExpanded = expandedRows.has(tracking.trackingId);
-                return (
-                  <div key={tracking.id} className="hover:bg-slate-50 transition-colors">
-                    {/* Main Row */}
-                    <div className="p-6 flex items-center justify-between">
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-                        <div>
-                          <div className="text-sm text-slate-500 mb-1">Tracking ID</div>
-                          <div className="font-semibold text-slate-900">{tracking.trackingId}</div>
-                        </div>
-                        <div>
-                          <div className="text-sm text-slate-500 mb-1">Provider</div>
-                          <div className="font-medium text-slate-700">{tracking.provider}</div>
-                        </div>
-                        <div>
-                          <div className="text-sm text-slate-500 mb-1">Latest Status</div>
-                          <span
-                            className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                              tracking.latestStatus
-                            )}`}
-                          >
-                            {tracking.latestStatus}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="text-sm text-slate-500 mb-1">Last Updated</div>
-                          <div className="text-sm text-slate-700">{formatDate(tracking.lastUpdated)}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <button
-                          onClick={() => refreshTracking(tracking.trackingId)}
-                          disabled={refreshing === tracking.trackingId || !tracking.isActive}
-                          className="px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-                          title="Refresh tracking status"
-                        >
-                          {refreshing === tracking.trackingId ? (
-                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          ) : (
-                            "Refresh"
-                          )}
-                        </button>
-                        <button
-                          onClick={() => toggleRow(tracking.trackingId)}
-                          className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors text-sm flex items-center gap-2"
-                        >
-                          {isExpanded ? "Hide" : "Show"} History
-                          <svg
-                            className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Expanded Status History */}
-                    {isExpanded && (
-                      <div className="px-6 pb-6 bg-slate-50 border-t border-slate-200">
-                        <h3 className="text-sm font-semibold text-slate-700 mb-4 mt-4">Status History</h3>
-                        {!tracking.statusHistory || tracking.statusHistory.length === 0 ? (
-                          <p className="text-sm text-slate-500 italic">No status history available</p>
-                        ) : (
-                          <div className="space-y-3">
-                            {tracking.statusHistory.map((status, index) => (
-                              <div
-                                key={index}
-                                className="bg-white rounded-lg border border-slate-200 p-4 flex items-start gap-4"
+            <div>
+              {/* Active Shipments Section */}
+              {getActiveShipments().length > 0 && (
+                <div className="divide-y divide-slate-200 border-b border-slate-200">
+                  <div className="p-6 bg-blue-50 border-b border-blue-200">
+                    <h3 className="text-lg font-semibold text-blue-900">Active Shipments</h3>
+                    <p className="text-sm text-blue-700 mt-1">{getActiveShipments().length} shipment{getActiveShipments().length !== 1 ? "s" : ""}</p>
+                  </div>
+                  {getActiveShipments().map((tracking) => {
+                    const isExpanded = expandedRows.has(tracking.trackingId);
+                    return (
+                      <div key={tracking.id} className="hover:bg-slate-50 transition-colors">
+                        {/* Main Row */}
+                        <div className="p-6 flex items-center justify-between">
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                            <div>
+                              <div className="text-sm text-slate-500 mb-1">Tracking ID</div>
+                              <div className="font-semibold text-slate-900">{tracking.trackingId}</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-slate-500 mb-1">Provider</div>
+                              <div className="font-medium text-slate-700">{tracking.provider}</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-slate-500 mb-1">Latest Status</div>
+                              <span
+                                className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                                  tracking.latestStatus
+                                )}`}
                               >
-                                <div className="flex-shrink-0">
-                                  <div className="w-2 h-2 rounded-full bg-blue-600 mt-2"></div>
-                                  {tracking.statusHistory && index < tracking.statusHistory.length - 1 && (
-                                    <div className="w-0.5 h-8 bg-slate-300 ml-0.5"></div>
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span
-                                      className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                                        status.status
-                                      )}`}
-                                    >
-                                      {status.status}
-                                    </span>
-                                    <span className="text-xs text-slate-500">{formatDate(status.timestamp)}</span>
+                                {tracking.latestStatus}
+                              </span>
+                            </div>
+                            <div>
+                              <div className="text-sm text-slate-500 mb-1">Last Updated</div>
+                              <div className="text-sm text-slate-700">{formatDate(tracking.lastUpdated)}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 ml-4">
+                            <button
+                              onClick={() => refreshTracking(tracking.trackingId)}
+                              disabled={refreshing === tracking.trackingId || !tracking.isActive}
+                              className="px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                              title="Refresh tracking status"
+                            >
+                              {refreshing === tracking.trackingId ? (
+                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : (
+                                "Refresh"
+                              )}
+                            </button>
+                            <button
+                              onClick={() => toggleRow(tracking.trackingId)}
+                              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors text-sm flex items-center gap-2"
+                            >
+                              {isExpanded ? "Hide" : "Show"} History
+                              <svg
+                                className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => deleteTracking(tracking.trackingId)}
+                              disabled={deleting === tracking.trackingId}
+                              className="px-3 py-1.5 rounded-lg border border-red-300 bg-red-50 text-red-700 font-medium hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center gap-2"
+                              title="Delete tracking record"
+                            >
+                              {deleting === tracking.trackingId ? (
+                                <>
+                                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Deleting...
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  Delete
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Expanded Status History */}
+                        {isExpanded && (
+                          <div className="px-6 pb-6 bg-slate-50 border-t border-slate-200">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-4 mt-4">Status History</h3>
+                            {!tracking.statusHistory || tracking.statusHistory.length === 0 ? (
+                              <p className="text-sm text-slate-500 italic">No status history available</p>
+                            ) : (
+                              <div className="space-y-3">
+                                {tracking.statusHistory.map((status, index) => (
+                                  <div
+                                    key={index}
+                                    className="bg-white rounded-lg border border-slate-200 p-4 flex items-start gap-4"
+                                  >
+                                    <div className="shrink-0">
+                                      <div className="w-2 h-2 rounded-full bg-blue-600 mt-2"></div>
+                                      {tracking.statusHistory && index < tracking.statusHistory.length - 1 && (
+                                        <div className="w-0.5 h-8 bg-slate-300 ml-0.5"></div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span
+                                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                                            status.status
+                                          )}`}
+                                        >
+                                          {status.status}
+                                        </span>
+                                        <span className="text-xs text-slate-500">{formatDate(status.timestamp)}</span>
+                                      </div>
+                                      {status.description && (
+                                        <div className="text-sm text-slate-600">
+                                          <strong>Description:</strong> {status.description}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                  {status.location && (
-                                    <div className="text-sm text-slate-600 mb-1">
-                                      <strong>Location:</strong> {status.location}
-                                    </div>
-                                  )}
-                                  {status.description && (
-                                    <div className="text-sm text-slate-600">
-                                      <strong>Description:</strong> {status.description}
-                                    </div>
-                                  )}
-                                </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Old Deliveries Section (Expandable) */}
+              {getOldDeliveries().length > 0 && (
+                <div className="border-t-2 border-slate-300">
+                  <button
+                    onClick={() => setExpandedOverdueSection(!expandedOverdueSection)}
+                    className="w-full p-6 bg-slate-100 hover:bg-slate-200 transition-colors border-b border-slate-300 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="shrink-0">
+                        <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-lg font-semibold text-slate-900">Old Deliveries</h3>
+                        <p className="text-sm text-slate-600">
+                          {getOldDeliveries().length} delivered shipment{getOldDeliveries().length !== 1 ? "s" : ""} - completed over 3 days ago
+                        </p>
+                      </div>
+                    </div>
+                    <svg
+                      className={`w-5 h-5 text-slate-600 transition-transform ${expandedOverdueSection ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {expandedOverdueSection && (
+                    <div className="divide-y divide-slate-200">
+                      {getOldDeliveries().map((tracking) => {
+                        const isExpanded = expandedRows.has(tracking.trackingId);
+                        return (
+                          <div key={tracking.id} className="hover:bg-slate-100 transition-colors">
+                            {/* Main Row */}
+                            <div className="p-6 flex items-center justify-between bg-slate-50">
+                              <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                                <div>
+                                  <div className="text-sm text-slate-500 mb-1">Tracking ID</div>
+                                  <div className="font-semibold text-slate-900">{tracking.trackingId}</div>
+                                </div>
+                                <div>
+                                  <div className="text-sm text-slate-500 mb-1">Provider</div>
+                                  <div className="font-medium text-slate-700">{tracking.provider}</div>
+                                </div>
+                                <div>
+                                  <div className="text-sm text-slate-500 mb-1">Latest Status</div>
+                                  <span
+                                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                                      tracking.latestStatus
+                                    )}`}
+                                  >
+                                    {tracking.latestStatus}
+                                  </span>
+                                </div>
+                                <div>
+                                  <div className="text-sm text-slate-500 mb-1">Delivered On</div>
+                                  <div className="text-sm text-slate-700">
+                                    {formatDate(tracking.lastUpdated)}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 ml-4">
+                                <button
+                                  onClick={() => refreshTracking(tracking.trackingId)}
+                                  disabled={refreshing === tracking.trackingId}
+                                  className="px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                  title="Refresh tracking status"
+                                >
+                                  {refreshing === tracking.trackingId ? (
+                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  ) : (
+                                    "Refresh"
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => toggleRow(tracking.trackingId)}
+                                  className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors text-sm flex items-center gap-2"
+                                >
+                                  {isExpanded ? "Hide" : "Show"} History
+                                  <svg
+                                    className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => deleteTracking(tracking.trackingId)}
+                                  disabled={deleting === tracking.trackingId}
+                                  className="px-3 py-1.5 rounded-lg border border-red-300 bg-red-50 text-red-700 font-medium hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center gap-2"
+                                  title="Delete tracking record"
+                                >
+                                  {deleting === tracking.trackingId ? (
+                                    <>
+                                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Deleting...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                      Delete
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Expanded Status History */}
+                            {isExpanded && (
+                              <div className="px-6 pb-6 bg-slate-50 border-t border-slate-200">
+                                <h3 className="text-sm font-semibold text-slate-700 mb-4 mt-4">Status History</h3>
+                                {!tracking.statusHistory || tracking.statusHistory.length === 0 ? (
+                                  <p className="text-sm text-slate-500 italic">No status history available</p>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {tracking.statusHistory.map((status, index) => (
+                                      <div
+                                        key={index}
+                                        className="bg-white rounded-lg border border-slate-200 p-4 flex items-start gap-4"
+                                      >
+                                    <div className="shrink-0">
+                                      <div className="w-2 h-2 rounded-full bg-slate-400 mt-2"></div>
+                                          {tracking.statusHistory && index < tracking.statusHistory.length - 1 && (
+                                            <div className="w-0.5 h-8 bg-slate-300 ml-0.5"></div>
+                                          )}
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span
+                                              className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                                                status.status
+                                              )}`}
+                                            >
+                                              {status.status}
+                                            </span>
+                                            <span className="text-xs text-slate-500">{formatDate(status.timestamp)}</span>
+                                          </div>
+                                          {status.description && (
+                                            <div className="text-sm text-slate-600">
+                                              <strong>Description:</strong> {status.description}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -18,7 +18,6 @@ interface UserEnvironment {
 interface TrackingStatus {
   status: string;
   timestamp: Date;
-  location?: string;
   description?: string;
 }
 
@@ -28,9 +27,9 @@ interface TrackingResponse {
   statusHistory: Array<{
     status: string;
     date: string;
-    location?: string;
     description?: string;
   }>;
+  deliveryDate?: Date; // Expected delivery date
   [key: string]: any;
 }
 
@@ -228,6 +227,34 @@ class MalcaAmitService {
   }
 
   /**
+   * Parse delivery date from API response
+   */
+  private parseDeliveryDate(dateString: string | undefined): Date | undefined {
+    if (!dateString) return undefined;
+    
+    try {
+      // Parse format: "30/12/2025" or "30/12/2025 09:14" (DD/MM/YYYY or DD/MM/YYYY HH:mm)
+      const parts = dateString.split(' ');
+      const datePart = parts[0];
+      const timePart = parts[1] || '00:00';
+      
+      const [day, month, year] = datePart.split('/');
+      const [hour, minute] = timePart.split(':');
+      
+      return new Date(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(hour),
+        parseInt(minute)
+      );
+    } catch (e) {
+      console.warn(`Failed to parse delivery date: ${dateString}`, e);
+      return undefined;
+    }
+  }
+
+  /**
    * Get tracking information for a shipment
    */
   async getTracking(shipmentNumber: string): Promise<TrackingStatus[]> {
@@ -261,6 +288,11 @@ class MalcaAmitService {
       // Transform API response to our TrackingStatus format
       const statusHistory: TrackingStatus[] = [];
       const data = response.data;
+      
+      // Extract and store delivery date for later use
+      (statusHistory as any).deliveryDate = this.parseDeliveryDate(
+        data.deliveryDateUTC || data.deliveryDate || data.estimatedDeliveryDateUTC || data.estimatedDeliveryDate
+      );
 
       // Malca-Amit API returns data with "steps" array and "latestStatus"
       if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
@@ -302,19 +334,9 @@ class MalcaAmitService {
             console.warn(`Failed to parse timestamp for step: ${step.recordingTime || step.recordingTimeUTC}`, e);
           }
 
-          // Build location string from origin/destination if available
-          let location: string | undefined = undefined;
-          if (data.originCity && data.originCountry) {
-            location = `${data.originCity}, ${data.originCountry}`;
-          }
-          if (data.destinationCity && data.destinationCountry && step.stepActionID >= 500) {
-            location = `${data.destinationCity}, ${data.destinationCountry}`;
-          }
-
           statusHistory.push({
             status: step.stepDesciption || step.stepDescription || step.description || 'Unknown', // Note: API has typo "stepDesciption"
             timestamp: timestamp,
-            location: location,
             description: step.stepDesciption || step.stepDescription || null, // Use step description as description
           });
         });
@@ -359,9 +381,6 @@ class MalcaAmitService {
             statusHistory.push({
               status: data.latestStatus,
               timestamp: latestTimestamp,
-              location: data.destinationCity && data.destinationCountry 
-                ? `${data.destinationCity}, ${data.destinationCountry}` 
-                : undefined,
               description: data.latestStatus,
             });
           }
@@ -403,11 +422,6 @@ class MalcaAmitService {
         statusHistory.push({
           status: data.latestStatus,
           timestamp: timestamp,
-          location: data.destinationCity && data.destinationCountry 
-            ? `${data.destinationCity}, ${data.destinationCountry}` 
-            : (data.originCity && data.originCountry 
-              ? `${data.originCity}, ${data.originCountry}` 
-              : undefined),
           description: data.latestStatus,
         });
       }

@@ -26,6 +26,7 @@ router.post('/upload', upload.single('file'), trackingController.uploadTrackingE
 router.get('/', trackingController.getAllTrackings);
 router.get('/:trackingId', trackingController.getTrackingDetails);
 router.post('/:trackingId/refresh', trackingController.refreshTracking);
+router.delete('/:trackingId', trackingController.deleteTracking);
 
 export default router;
 
