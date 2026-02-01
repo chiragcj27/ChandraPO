@@ -333,11 +333,15 @@ function DashboardPage() {
     });
   }, [rowData, searchQuery]);
 
-  // Fetch data on mount
+  // Fetch data on mount (clients list only for admins – client users can't upload)
   useEffect(() => {
     void fetchPOs();
-    void loadClients();
-  }, [fetchPOs]);
+    if (isAdmin) {
+      void loadClients();
+    } else {
+      setClients([]);
+    }
+  }, [fetchPOs, isAdmin]);
 
   const loadClients = async () => {
     setClientLoading(true);
