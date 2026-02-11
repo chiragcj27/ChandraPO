@@ -1,6 +1,7 @@
 import * as cron from 'node-cron';
 import { Tracking, TrackingStatus } from '@repo/db';
 import { malcaAmitService } from './malca-amit.service';
+import { sendDeliveryNotificationEmail } from './delivery-email.service';
 
 /**
  * Fetch and update tracking status for a single tracking record
@@ -39,6 +40,8 @@ const updateTrackingStatus = async (tracking: any): Promise<void> => {
 
     // Check if status is "delivered" - if so, mark as inactive
     const isActive = latestStatus.toLowerCase() !== 'delivered';
+    const wasDeliveredBefore = (tracking.latestStatus || '').toLowerCase().includes('delivered');
+    const isNowDelivered = !isActive;
 
     // Update tracking record
     await Tracking.findByIdAndUpdate(tracking._id, {
@@ -47,6 +50,17 @@ const updateTrackingStatus = async (tracking: any): Promise<void> => {
       isActive,
       lastUpdated: new Date(),
     });
+
+    // Notify when status just changed to delivered
+    if (!wasDeliveredBefore && isNowDelivered) {
+      sendDeliveryNotificationEmail({
+        trackingId: tracking.trackingId,
+        provider: tracking.provider,
+        latestStatus,
+      }).catch((err) =>
+        console.error(`[Cron] Delivery email failed for ${tracking.trackingId}:`, err)
+      );
+    }
 
     console.log(`Updated tracking ${tracking.trackingId}: ${latestStatus} (Active: ${isActive})`);
   } catch (error: any) {

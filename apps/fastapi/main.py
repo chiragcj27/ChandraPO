@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
 from dotenv import load_dotenv
+import pandas as pd
 
 load_dotenv()
 API_KEY = os.getenv("GOOGLE_API_KEY")

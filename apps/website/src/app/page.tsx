@@ -11,7 +11,7 @@ import type {
 } from "ag-grid-community";
 import type { PurchaseOrder } from "../types/po";
 import { useRouter } from "next/navigation";
-import { authenticatedFetch } from "@/lib/api";
+import { authenticatedFetch} from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import DropdownFilter from "@/components/DropdownFilter";
@@ -30,8 +30,7 @@ type ClientRecord = {
 function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const gridApiRef = useRef<GridApi<PurchaseOrder> | null>(null);
-  const [rowData, setRowData] = useState<PurchaseOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingPO, setDeletingPO] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ poNumber: string; clientName: string } | null>(null);
@@ -278,70 +277,74 @@ function DashboardPage() {
     [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, PONumberCellRenderer, TotalValueCellRenderer, isAdmin, clients]
   );
 
-  const fetchPOs = useCallback(async () => {
-    setLoading(true);
-    try {
-      // First, get the total count by fetching a small batch
-      const countRes = await authenticatedFetch(`/po?startRow=0&endRow=1`);
-      if (!countRes.ok) {
-        throw new Error("Failed to load purchase orders");
-      }
-      const countPayload = await countRes.json();
-      const totalCount = typeof countPayload?.rowCount === "number"
-        ? countPayload.rowCount
-        : 0;
-
-      // Fetch all data
-      const res = await authenticatedFetch(`/po?startRow=0&endRow=${Math.max(totalCount, 1000)}`);
-      if (!res.ok) {
-        throw new Error("Failed to load purchase orders");
-      }
-      const payload = await res.json();
-      const rows: PurchaseOrder[] = Array.isArray(payload)
-        ? payload
-        : payload?.rowData || payload?.data || [];
-      setRowData(rows);
-    } catch (error) {
-      console.error("Failed to fetch purchase orders", error);
-      setRowData([]);
-    } finally {
-      setLoading(false);
+  const refreshGrid = useCallback(() => {
+    const api = gridApiRef.current as (GridApi<PurchaseOrder> & { refreshInfiniteCache?: () => void }) | null;
+    if (api?.refreshInfiniteCache) {
+      api.refreshInfiniteCache();
     }
   }, []);
 
-  const refreshGrid = useCallback(() => {
-    void fetchPOs();
-  }, [fetchPOs]);
+  const infiniteDatasource = useMemo(() => ({
+    getRows: (params: {
+      startRow: number;
+      endRow: number;
+      successCallback: (rows: PurchaseOrder[], lastRow?: number) => void;
+      failCallback: () => void;
+    }) => {
+      const { startRow, endRow, successCallback, failCallback } = params;
+      const search = searchQuery.trim() || undefined;
+
+      const qp = new URLSearchParams();
+      qp.set("startRow", String(startRow));
+      qp.set("endRow", String(endRow));
+      if (search) qp.set("search", search);
+      const endpoint = `/po?${qp.toString()}`;
+
+      setLoading(true);
+      authenticatedFetch(endpoint)
+        .then(async (res) => {
+          if (!res.ok) {
+            failCallback();
+            return;
+          }
+          const payload = await res.json();
+          const rows: PurchaseOrder[] = Array.isArray(payload)
+            ? payload
+            : payload?.rowData ?? payload?.data ?? [];
+          const rowCount = typeof payload?.rowCount === "number" ? payload.rowCount : undefined;
+          const lastRow = rowCount != null ? rowCount : (rows.length < endRow - startRow ? startRow + rows.length : undefined);
+          successCallback(rows, lastRow);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch POs (infinite)", err);
+          failCallback();
+        })
+        .finally(() => setLoading(false));
+    },
+  }), [searchQuery]);
 
   const onGridReady = useCallback(
     (params: GridReadyEvent<PurchaseOrder>) => {
       gridApiRef.current = params.api;
+      params.api.setGridOption("datasource", infiniteDatasource);
     },
-    [],
+    [infiniteDatasource],
   );
 
-  // Filter rowData based on search query
-  const filteredRowData = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return rowData;
-    }
-    const query = searchQuery.toLowerCase().trim();
-    return rowData.filter((po) => {
-      const poNumber = po.PONumber?.toLowerCase() || "";
-      const clientName = po.ClientName?.toLowerCase() || "";
-      return poNumber.includes(query) || clientName.includes(query);
-    });
-  }, [rowData, searchQuery]);
-
-  // Fetch data on mount (clients list only for admins – client users can't upload)
+  // Update datasource when search changes (grid may already be ready)
   useEffect(() => {
-    void fetchPOs();
+    if (!gridApiRef.current) return;
+    gridApiRef.current.setGridOption("datasource", infiniteDatasource);
+  }, [infiniteDatasource]);
+
+  // Load clients on mount for admins
+  useEffect(() => {
     if (isAdmin) {
       void loadClients();
     } else {
       setClients([]);
     }
-  }, [fetchPOs, isAdmin]);
+  }, [isAdmin]);
 
   const loadClients = async () => {
     setClientLoading(true);
@@ -438,8 +441,44 @@ function DashboardPage() {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: "Upload failed" }));
-        const errorMessage = errorData.message || errorData.error || "Upload failed";
+        const contentType = res.headers.get("content-type") || "";
+        let errorData: Record<string, unknown> | null = null;
+        let rawText: string | null = null;
+
+        try {
+          if (contentType.includes("application/json")) {
+            errorData = await res.json();
+          } else {
+            rawText = await res.text();
+          }
+        } catch {
+          // If parsing fails, attempt best-effort text read
+          try {
+            rawText = await res.text();
+          } catch {
+            rawText = null;
+          }
+        }
+
+        // Prefer the more specific backend "error" field when present.
+        const message =
+          (typeof errorData?.message === "string" && errorData.message.trim()) ? errorData.message.trim() : "";
+        const detail =
+          (typeof errorData?.error === "string" && errorData.error.trim()) ? errorData.error.trim() : "";
+        const fallbackText = (rawText && rawText.trim()) ? rawText.trim() : "";
+
+        const errorMessage =
+          detail && message && message !== detail
+            ? `${message}: ${detail}`
+            : (detail || message || fallbackText || `Upload failed (${res.status})`);
+
+        console.error("PO upload failed:", {
+          status: res.status,
+          statusText: res.statusText,
+          errorData,
+          rawText,
+        });
+
         throw new Error(errorMessage);
       }
 
@@ -684,13 +723,14 @@ function DashboardPage() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="ag-theme-quartz w-full h-[calc(100vh-280px)] min-h-[600px]">
             <AgGridReact<PurchaseOrder>
-              rowData={filteredRowData}
+              rowModelType="infinite"
+              datasource={infiniteDatasource}
+              cacheBlockSize={50}
+              maxBlocksInCache={10}
+              getRowId={(params) => params.data?.PONumber ?? ""}
               columnDefs={columnDefs}
               animateRows
               loading={loading}
-              pagination={true}
-              paginationPageSize={25}
-              paginationPageSizeSelector={[10, 25, 50, 100]}
               rowHeight={56}
               headerHeight={56}
               suppressHorizontalScroll={false}

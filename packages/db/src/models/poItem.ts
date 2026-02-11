@@ -41,7 +41,7 @@ export const poItemSchema = new mongoose.Schema<POItemInterface>({
     itemSize: { type: String, default: null },
     deadlineDate: { type: Date, default: null },
     shippingDate: { type: Date, default: null },
-    invoiceNumber: { type: String, required: true, default: "" },
+    invoiceNumber: { type: String, required: false, default: "" },
     exportedToExcel: { type: Boolean, required: true, default: false },
     completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 }, {

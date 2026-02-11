@@ -30,6 +30,8 @@ const formatDateForClient = (value?: Date | string | null) => {
   return date.toISOString().split('T')[0];
 };
 
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const mapRecordToDTO = (record: POItemRecord, completedByUser?: any): PurchaseOrderItemDTO => {
   let completedByName: string | null = null;
   if (completedByUser) {
@@ -445,6 +447,7 @@ export const getPOs = async (req: AuthRequest, res: Response) => {
     const endRow = parseInt(req.query.endRow as string) || 100;
     const limit = endRow - startRow;
     const skip = startRow;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
 
     // Build query based on user role
     let query: any = {};
@@ -464,6 +467,15 @@ export const getPOs = async (req: AuthRequest, res: Response) => {
       }
     }
     // Admin users see all POs (empty query)
+
+    // Optional search filter (PO number or client name)
+    if (search) {
+      const searchRegex = new RegExp(escapeRegex(search), 'i');
+      query.$or = [
+        { poNumber: searchRegex },
+        { clientName: searchRegex },
+      ];
+    }
 
     // Get total count for infinite scrolling
     const totalCount = await PO.countDocuments(query);
@@ -738,6 +750,15 @@ export const uploadPO = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Error in uploadPO:', error);
+    
+    // Log detailed error information for debugging
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+    }
 
     // Clean up: Delete file from S3 if upload succeeded but processing failed
     if (uploadResult?.key) {
@@ -761,7 +782,12 @@ export const uploadPO = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    res.status(500).json({ message: 'Failed to upload PO', error: (error as Error).message });
+    // Return detailed error message
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    res.status(500).json({ 
+      message: 'Failed to upload PO', 
+      error: errorMessage 
+    });
   }
 };
 

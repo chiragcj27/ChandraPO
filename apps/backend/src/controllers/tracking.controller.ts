@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as XLSX from 'xlsx';
 import { Tracking, TrackingStatus } from '@repo/db';
 import { malcaAmitService } from '../services/malca-amit.service';
+import { sendDeliveryNotificationEmail } from '../services/delivery-email.service';
 
 interface ExcelRow {
   trackingId?: string;
@@ -143,6 +144,13 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
           deliveryDate,
         });
 
+        // Notify when shipment is already delivered (e.g. from Excel upload)
+        if (latestStatus.toLowerCase() === 'delivered') {
+          sendDeliveryNotificationEmail({ trackingId, provider, latestStatus }).catch((err) =>
+            console.error(`[Tracking] Delivery email failed for ${trackingId}:`, err)
+          );
+        }
+
         results.added++;
       } catch (error: any) {
         console.error(`Error processing tracking ${trackingId}:`, error);
@@ -239,8 +247,11 @@ export const refreshTracking = async (req: Request, res: Response) => {
       tracking.provider
     );
 
+    const wasDeliveredBefore = tracking.latestStatus.toLowerCase().includes('delivered');
+    const isNowDelivered = latestStatus.toLowerCase().includes('delivered');
+
     // Update tracking record
-    const isActive = latestStatus.toLowerCase() !== 'delivered';
+    const isActive = !isNowDelivered;
 
     tracking.latestStatus = latestStatus;
     tracking.statusHistory = statusHistory;
@@ -251,6 +262,17 @@ export const refreshTracking = async (req: Request, res: Response) => {
     }
 
     await tracking.save();
+
+    // Notify when status just changed to delivered
+    if (!wasDeliveredBefore && isNowDelivered) {
+      sendDeliveryNotificationEmail({
+        trackingId: tracking.trackingId,
+        provider: tracking.provider,
+        latestStatus,
+      }).catch((err) =>
+        console.error(`[Tracking] Delivery email failed for ${tracking.trackingId}:`, err)
+      );
+    }
 
     res.status(200).json({
       message: 'Tracking refreshed successfully',
