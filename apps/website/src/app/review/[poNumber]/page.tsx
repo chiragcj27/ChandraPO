@@ -283,8 +283,8 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
       DesignProductionInstruction: null,
       StampInstruction: null,
       ItemSize: null,
-      DeadlineDate: null,
-      ShippingDate: null,
+      ProductionDeliveryDate: null,
+      ExpectedDeliveryDate: null,
       InvoiceNumber: "",
       ExportedToExcel: false,
     };
@@ -366,8 +366,8 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     { key: "OrderQty", label: "Order Quantity" },
     { key: "StockType", label: "Stock Type" },
     { key: "ItemSize", label: "Item Size" },
-    { key: "DeadlineDate", label: "Deadline Date" },
-    { key: "ShippingDate", label: "Shipping Date" },
+    { key: "ProductionDeliveryDate", label: "Production Delivery Date" },
+    { key: "ExpectedDeliveryDate", label: "Expected Delivery Date" },
     { key: "CustomerProductionInstruction", label: "Customer Production Instruction" },
     { key: "SpecialRemarks", label: "Special Remarks" },
     { key: "DesignProductionInstruction", label: "Design Production Instruction" },
@@ -479,6 +479,18 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     ];
 
     const exportRows = completedItems.map((item, index) => {
+      // Helper function to format date as YYYY-MM-DD
+      const formatDateForExcel = (date: Date | string | null | undefined): string => {
+        if (!date) return "";
+        try {
+          const dateObj = typeof date === "string" ? new Date(date) : date;
+          if (isNaN(dateObj.getTime())) return "";
+          return dateObj.toISOString().split("T")[0];
+        } catch {
+          return "";
+        }
+      };
+
       // Create row data in the exact column order
       const rowData: (string | number)[] = [
         index + 1, // SrNo
@@ -491,7 +503,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
         item.ItemPoNo ?? "", // ItemPoNo
         item.ItemRefNo ?? "", // ItemRefNo
         item.StockType ?? "", // StockType
-        "casting", // MakeType - Default value: casting
+        "CASTING", // MakeType - Default value: CASTING
         item.CustomerProductionInstruction ?? "", // CustomerProductionInstruction
         item.SpecialRemarks ?? "", // SpecialRemarks
         item.DesignProductionInstruction ?? "", // DesignProductionInstruction
@@ -503,8 +515,8 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
         "", // Basestonemaxwt - Not in data model
         "", // Basemetalminwt - Not in data model
         "", // Basemetalmaxwt - Not in data model
-        "", // Productiondeliverydate - Not in data model
-        "", // Expecteddeliverydate - Not in data model
+        formatDateForExcel(item.ProductionDeliveryDate), // Productiondeliverydate
+        formatDateForExcel(item.ExpectedDeliveryDate), // Expecteddeliverydate
         "", // Empty column
         "", // SetPrice - Not in data model
         "", // StoneQuality - Not in data model
@@ -571,6 +583,18 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     ];
 
     const exportRows = sessionCompletedItems.map((item, index) => {
+      // Helper function to format date as YYYY-MM-DD
+      const formatDateForExcel = (date: Date | string | null | undefined): string => {
+        if (!date) return "";
+        try {
+          const dateObj = typeof date === "string" ? new Date(date) : date;
+          if (isNaN(dateObj.getTime())) return "";
+          return dateObj.toISOString().split("T")[0];
+        } catch {
+          return "";
+        }
+      };
+
       // Create row data in the exact column order
       const rowData: (string | number)[] = [
         index + 1, // SrNo
@@ -583,7 +607,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
         item.ItemPoNo ?? "", // ItemPoNo
         item.ItemRefNo ?? "", // ItemRefNo
         item.StockType ?? "", // StockType
-        "casting", // MakeType - Default value: casting
+        "CASTING", // MakeType - Default value: CASTING
         item.CustomerProductionInstruction ?? "", // CustomerProductionInstruction
         item.SpecialRemarks ?? "", // SpecialRemarks
         item.DesignProductionInstruction ?? "", // DesignProductionInstruction
@@ -595,8 +619,8 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
         "", // Basestonemaxwt - Not in data model
         "", // Basemetalminwt - Not in data model
         "", // Basemetalmaxwt - Not in data model
-        "", // Productiondeliverydate - Not in data model
-        "", // Expecteddeliverydate - Not in data model
+        formatDateForExcel(item.ProductionDeliveryDate), // Productiondeliverydate
+        formatDateForExcel(item.ExpectedDeliveryDate), // Expecteddeliverydate
         "", // Empty column
         "", // SetPrice - Not in data model
         "", // StoneQuality - Not in data model
@@ -655,15 +679,15 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
             DesignProductionInstruction: item.DesignProductionInstruction ?? null,
             StampInstruction: item.StampInstruction ?? null,
             ItemSize: item.ItemSize ?? null,
-            DeadlineDate: item.DeadlineDate
-              ? typeof item.DeadlineDate === "string"
-                ? item.DeadlineDate
-                : new Date(item.DeadlineDate).toISOString().split("T")[0]
+            ProductionDeliveryDate: item.ProductionDeliveryDate
+              ? typeof item.ProductionDeliveryDate === "string"
+                ? item.ProductionDeliveryDate
+                : new Date(item.ProductionDeliveryDate).toISOString().split("T")[0]
               : null,
-            ShippingDate: item.ShippingDate
-              ? typeof item.ShippingDate === "string"
-                ? item.ShippingDate
-                : new Date(item.ShippingDate).toISOString().split("T")[0]
+            ExpectedDeliveryDate: item.ExpectedDeliveryDate
+              ? typeof item.ExpectedDeliveryDate === "string"
+                ? item.ExpectedDeliveryDate
+                : new Date(item.ExpectedDeliveryDate).toISOString().split("T")[0]
               : null,
             InvoiceNumber: item.InvoiceNumber || "",
             ExportedToExcel: item.ExportedToExcel ?? false,
@@ -824,15 +848,15 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
           DesignProductionInstruction: item.DesignProductionInstruction ?? null,
           StampInstruction: item.StampInstruction ?? null,
           ItemSize: item.ItemSize ?? null,
-          DeadlineDate: item.DeadlineDate
-            ? typeof item.DeadlineDate === "string"
-              ? item.DeadlineDate
-              : new Date(item.DeadlineDate).toISOString().split("T")[0]
+          ProductionDeliveryDate: item.ProductionDeliveryDate
+            ? typeof item.ProductionDeliveryDate === "string"
+              ? item.ProductionDeliveryDate
+              : new Date(item.ProductionDeliveryDate).toISOString().split("T")[0]
             : null,
-          ShippingDate: item.ShippingDate
-            ? typeof item.ShippingDate === "string"
-              ? item.ShippingDate
-              : new Date(item.ShippingDate).toISOString().split("T")[0]
+          ExpectedDeliveryDate: item.ExpectedDeliveryDate
+            ? typeof item.ExpectedDeliveryDate === "string"
+              ? item.ExpectedDeliveryDate
+              : new Date(item.ExpectedDeliveryDate).toISOString().split("T")[0]
             : null,
           InvoiceNumber: item.InvoiceNumber || "",
           ExportedToExcel: item.ExportedToExcel ?? false,

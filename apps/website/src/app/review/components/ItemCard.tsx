@@ -265,8 +265,8 @@ export default function ItemCard({
             <option value="G10KT">G10KT</option>
             <option value="G14KT">G14KT</option>
             <option value="G18KT">G18KT</option>
-            <option value="950">950</option>
-            <option value="SV925">SV925</option>
+            <option value="PT950">PT950</option>
+            <option value="S925">S925</option>
           </select>
         </div>
 
@@ -310,7 +310,7 @@ export default function ItemCard({
             <option value="Pendant">Pendant</option>
             <option value="Necklace">Necklace</option>
             <option value="Bracelet">Bracelet</option>
-            <option value="Earings">Earings</option>
+            <option value="Earring">Earring</option>
             <option value="Bangle">Bangle</option>
           </select>
         </div>
@@ -424,45 +424,45 @@ export default function ItemCard({
 
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Deadline Date
+            Production Delivery Date
           </label>
           <input
             type="date"
             value={
-              item.DeadlineDate
-                ? new Date(item.DeadlineDate).toISOString().split("T")[0]
+              item.ProductionDeliveryDate
+                ? new Date(item.ProductionDeliveryDate).toISOString().split("T")[0]
                 : ""
             }
             disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, {
                 ...item,
-                DeadlineDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+                ProductionDeliveryDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
               })
             }
-            className={getInputClassName(typeof item.DeadlineDate === 'object' && item.DeadlineDate instanceof Date ? item.DeadlineDate.toISOString() : item.DeadlineDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
+            className={getInputClassName(typeof item.ProductionDeliveryDate === 'object' && item.ProductionDeliveryDate instanceof Date ? item.ProductionDeliveryDate.toISOString() : item.ProductionDeliveryDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
           />
         </div>
 
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Shipping Date
+            Expected Delivery Date
           </label>
           <input
             type="date"
             value={
-              item.ShippingDate
-                ? new Date(item.ShippingDate).toISOString().split("T")[0]
+              item.ExpectedDeliveryDate
+                ? new Date(item.ExpectedDeliveryDate).toISOString().split("T")[0]
                 : ""
             }
             disabled={readOnly}
             onChange={(e) =>
               onUpdateItem(index, {
                 ...item,
-                ShippingDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+                ExpectedDeliveryDate: e.target.value ? new Date(e.target.value).toISOString() : undefined,
               })
             }
-            className={getInputClassName(typeof item.ShippingDate === 'object' && item.ShippingDate instanceof Date ? item.ShippingDate.toISOString() : item.ShippingDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
+            className={getInputClassName(typeof item.ExpectedDeliveryDate === 'object' && item.ExpectedDeliveryDate instanceof Date ? item.ExpectedDeliveryDate.toISOString() : item.ExpectedDeliveryDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
           />
         </div>
 

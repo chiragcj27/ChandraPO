@@ -61,8 +61,8 @@ const mapRecordToDTO = (record: POItemRecord, completedByUser?: any): PurchaseOr
     DesignProductionInstruction: record.designProductionInstruction ?? null,
     StampInstruction: record.stampInstruction ?? null,
     ItemSize: record.itemSize ?? null,
-    DeadlineDate: formatDateForClient(record.deadlineDate ?? null) ?? null,
-    ShippingDate: formatDateForClient(record.shippingDate ?? null) ?? null,
+    ProductionDeliveryDate: formatDateForClient(record.productionDeliveryDate ?? null) ?? null,
+    ExpectedDeliveryDate: formatDateForClient(record.expectedDeliveryDate ?? null) ?? null,
     InvoiceNumber: record.invoiceNumber ?? '',
     ExportedToExcel: record.exportedToExcel ?? false,
     CompletedBy: record.completedBy ?? null,
@@ -86,8 +86,8 @@ const mapDTOToRecord = (item: PurchaseOrderItemDTO, completedByUserId?: string |
   designProductionInstruction: item.DesignProductionInstruction ?? null,
   stampInstruction: item.StampInstruction ?? null,
   itemSize: item.ItemSize ?? null,
-  deadlineDate: normalizeDate(item.DeadlineDate ?? undefined) ?? null,
-  shippingDate: normalizeDate(item.ShippingDate ?? undefined) ?? null,
+  productionDeliveryDate: normalizeDate(item.ProductionDeliveryDate ?? undefined) ?? null,
+  expectedDeliveryDate: normalizeDate(item.ExpectedDeliveryDate ?? undefined) ?? null,
   invoiceNumber: item.InvoiceNumber || '',
   exportedToExcel: Boolean(item.ExportedToExcel ?? false),
   completedBy: completedByUserId ?? null,
@@ -130,8 +130,8 @@ const mapDocToDTO = (po: any): PurchaseOrderDTO => {
             designProductionInstruction: item.designProductionInstruction ?? null,
             stampInstruction: item.stampInstruction ?? null,
             itemSize: item.itemSize ?? null,
-            deadlineDate: item.deadlineDate ?? null,
-            shippingDate: item.shippingDate ?? null,
+            productionDeliveryDate: item.productionDeliveryDate ?? null,
+            expectedDeliveryDate: item.expectedDeliveryDate ?? null,
             invoiceNumber: item.invoiceNumber ?? '',
             exportedToExcel: item.exportedToExcel ?? false,
             completedBy: item.completedBy 
@@ -169,8 +169,8 @@ const mapDocToDTO = (po: any): PurchaseOrderDTO => {
             designProductionInstruction: item.designProductionInstruction ?? null,
             stampInstruction: item.stampInstruction ?? null,
             itemSize: item.itemSize ?? null,
-            deadlineDate: item.deadlineDate ?? null,
-            shippingDate: item.shippingDate ?? null,
+            productionDeliveryDate: item.productionDeliveryDate ?? null,
+            expectedDeliveryDate: item.expectedDeliveryDate ?? null,
             invoiceNumber: item.invoiceNumber ?? '',
             exportedToExcel: item.exportedToExcel ?? false,
             completedBy: item.completedBy 
@@ -328,9 +328,9 @@ const normalizeMetal = (value: string | null | undefined): string => {
   if (!value) return '';
   const normalized = value.trim();
   const metalMap: Record<string, string> = {
-    'G09KT': 'G09KT', 'G10KT': 'G10KT', 'G14KT': 'G14KT', 'G18KT': 'G18KT', '950': '950', 'SV925': 'SV925',
+    'G09KT': 'G09KT', 'G10KT': 'G10KT', 'G14KT': 'G14KT', 'G18KT': 'G18KT', 'PT950': 'PT950', 'S925': 'S925',
     '9KT': 'G09KT', '10KT': 'G10KT', '14K': 'G14KT', '18K': 'G18KT',
-    'PLATINUM': '950', 'PT950': '950', 'SILVER': 'SV925', '925': 'SV925',
+    'PLATINUM': 'PT950', '950': 'PT950', 'SILVER': 'S925', 'SV925': 'S925', '925': 'S925',
   };
   return metalMap[normalized.toUpperCase()] || normalized;
 };
@@ -368,7 +368,7 @@ const normalizeStockType = (value: string | null | undefined): string | null => 
 const normalizeCategory = (value: string | null | undefined): string => {
   if (!value) return '';
   const normalized = value.trim();
-  const categories = ['Ring', 'Band', 'Pendant', 'Necklace', 'Bracelet', 'Earings', 'Bangle'];
+  const categories = ['Ring', 'Band', 'Pendant', 'Necklace', 'Bracelet', 'Earring', 'Bangle'];
   // Exact match first
   if (categories.includes(normalized)) return normalized;
   // Case-insensitive match
@@ -404,8 +404,8 @@ const mapExtractionLineToRecord = (line: ExtractedLine, invoiceNumber?: string):
   designProductionInstruction: line.DesignProductionInstruction ? line.DesignProductionInstruction.trim() : null,
   stampInstruction: line.StampInstruction ? line.StampInstruction.trim() : null,
   itemSize: line.ItemSize !== undefined && line.ItemSize !== null ? String(line.ItemSize).trim() : null,
-  deadlineDate: null,
-  shippingDate: null,
+  productionDeliveryDate: null,
+  expectedDeliveryDate: null,
   invoiceNumber: (invoiceNumber || '').trim(),
   exportedToExcel: false, // New items are never exported
   isDeleted: false, // New items are not deleted
@@ -605,8 +605,8 @@ const mapItemToLightweightDTO = (item: any) => {
     StockType: item.stockType ?? null,
     MakeType: item.makeType ?? null,
     ItemSize: item.itemSize ?? null,
-    DeadlineDate: formatDateForClient(item.deadlineDate ?? null) ?? null,
-    ShippingDate: formatDateForClient(item.shippingDate ?? null) ?? null,
+    ProductionDeliveryDate: formatDateForClient(item.productionDeliveryDate ?? null) ?? null,
+    ExpectedDeliveryDate: formatDateForClient(item.expectedDeliveryDate ?? null) ?? null,
     InvoiceNumber: item.invoiceNumber ?? '',
     CustomerProductionInstruction: item.customerProductionInstruction ?? null,
     SpecialRemarks: item.specialRemarks ?? null,
@@ -622,7 +622,7 @@ export const getPOItems = async (req: AuthRequest, res: Response) => {
       .populate({
         path: 'autoGeneratedContent',
         match: { isDeleted: { $ne: true } }, // Only populate non-deleted items
-        select: 'vendorStyleCode itemRefNo itemPoNo orderQty metal tone category stockType makeType itemSize deadlineDate shippingDate invoiceNumber customerProductionInstruction specialRemarks designProductionInstruction stampInstruction',
+        select: 'vendorStyleCode itemRefNo itemPoNo orderQty metal tone category stockType makeType itemSize productionDeliveryDate expectedDeliveryDate invoiceNumber customerProductionInstruction specialRemarks designProductionInstruction stampInstruction',
       })
       .lean();
     

@@ -42,8 +42,8 @@ export interface PurchaseOrderItem {
   DesignProductionInstruction?: string | null;
   StampInstruction?: string | null;
   ItemSize?: string | null;
-  DeadlineDate?: string | null;
-  ShippingDate?: string | null;
+  ProductionDeliveryDate?: string | null;
+  ExpectedDeliveryDate?: string | null;
   InvoiceNumber: string;
   ExportedToExcel?: boolean;
 }
@@ -88,8 +88,8 @@ export interface POItemRecord {
   designProductionInstruction?: string | null;
   stampInstruction?: string | null;
   itemSize?: string | null;
-  deadlineDate?: Date | null;
-  shippingDate?: Date | null;
+  productionDeliveryDate?: Date | null;
+  expectedDeliveryDate?: Date | null;
   invoiceNumber: string;
   exportedToExcel: boolean;
   completedBy?: string | null; // User ID who marked as complete
@@ -128,8 +128,8 @@ export interface PurchaseOrderItemDTO {
   DesignProductionInstruction?: string | null;
   StampInstruction?: string | null;
   ItemSize?: string | null;
-  DeadlineDate?: string | null;
-  ShippingDate?: string | null;
+  ProductionDeliveryDate?: string | null;
+  ExpectedDeliveryDate?: string | null;
   InvoiceNumber: string;
   ExportedToExcel?: boolean;
   CompletedBy?: string | null; // User ID who marked as complete

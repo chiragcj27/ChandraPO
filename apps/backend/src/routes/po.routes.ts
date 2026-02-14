@@ -7,7 +7,7 @@ import { authenticate, requireAdmin } from '../middleware/auth.middleware';
 const router: Router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
 });
 
 // All PO routes require authentication

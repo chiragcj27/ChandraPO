@@ -5,7 +5,7 @@ import trackingController from '../controllers/tracking.controller';
 const router: Router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for Excel files
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for Excel files
   fileFilter: (_req, file, cb) => {
     // Accept Excel files
     if (

@@ -16,8 +16,8 @@ export interface POItem {
   DesignProductionInstruction?: string | null;
   StampInstruction?: string | null;
   ItemSize?: string | null;
-  DeadlineDate?: Date | string | null;
-  ShippingDate?: Date | string | null;
+  ProductionDeliveryDate?: Date | string | null;
+  ExpectedDeliveryDate?: Date | string | null;
   InvoiceNumber: string;
   ExportedToExcel?: boolean;
   CompletedBy?: string | null; // User ID who marked as complete

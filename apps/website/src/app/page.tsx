@@ -27,13 +27,23 @@ type ClientRecord = {
   description?: string | null;
 };
 
+type UploadStatus = 'uploading' | 'extracting' | 'saving' | 'complete' | 'error';
+
+type UploadTask = {
+  id: string;
+  fileName: string;
+  status: UploadStatus;
+  message: string;
+  error?: string;
+  startTime: number;
+};
+
 function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const gridApiRef = useRef<GridApi<PurchaseOrder> | null>(null);
   const searchQueryRef = useRef<string>("");
   const activeFiltersRef = useRef<{ clientName?: string; status?: string }>({});
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [deletingPO, setDeletingPO] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ poNumber: string; clientName: string } | null>(null);
   const [clientModalOpen, setClientModalOpen] = useState(false);
@@ -48,11 +58,8 @@ function DashboardPage() {
   const [editingMapping, setEditingMapping] = useState<string | null>(null);
   const [editedMapping, setEditedMapping] = useState<string>("");
   const [savingMapping, setSavingMapping] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{
-    stage: 'uploading' | 'extracting' | 'saving' | 'complete' | 'error';
-    message: string;
-    error?: string;
-  } | null>(null);
+  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
+  const [showUploadPanel, setShowUploadPanel] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
   const { isAdmin, user, logout } = useAuth();
@@ -443,39 +450,41 @@ function DashboardPage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    if (!pendingClientSelection) {
-      alert("Select a client before uploading.");
-      return;
-    }
-    // Basic validation for expected items (optional but recommended)
-    const trimmedExpected = expectedItems.trim();
-    if (trimmedExpected) {
-      const num = Number(trimmedExpected);
-      if (!Number.isInteger(num) || num <= 0) {
-        alert("Expected number of items must be a positive whole number.");
-        return;
-      }
-    }
-    
-    setUploading(true);
-    const fileCount = files.length;
-    setUploadProgress({
-      stage: 'uploading',
-      message: `Uploading ${fileCount} file${fileCount > 1 ? 's' : ''} to server...`,
-    });
+  const updateUploadTask = (id: string, updates: Partial<UploadTask>) => {
+    setUploadTasks(prev => prev.map(task => 
+      task.id === id ? { ...task, ...updates } : task
+    ));
+  };
 
-    const uploadSingleFile = async (file: File) => {
+  const removeUploadTask = (id: string) => {
+    setUploadTasks(prev => prev.filter(task => task.id !== id));
+  };
+
+  const uploadSingleFile = async (
+    file: File, 
+    taskId: string,
+    clientSelection: { clientId?: string; clientName: string; clientMapping?: string },
+    expectedItemCount: string
+  ) => {
+    try {
+      updateUploadTask(taskId, {
+        status: 'uploading',
+        message: 'Uploading to server...'
+      });
+
       const form = new FormData();
       form.append("file", file);
-      form.append("clientName", pendingClientSelection.clientName);
-      if (pendingClientSelection.clientId) form.append("clientId", pendingClientSelection.clientId);
-      if (pendingClientSelection.clientMapping) form.append("clientMapping", pendingClientSelection.clientMapping);
-      if (expectedItems.trim()) {
-        form.append("expectedItems", expectedItems.trim());
+      form.append("clientName", clientSelection.clientName);
+      if (clientSelection.clientId) form.append("clientId", clientSelection.clientId);
+      if (clientSelection.clientMapping) form.append("clientMapping", clientSelection.clientMapping);
+      if (expectedItemCount.trim()) {
+        form.append("expectedItems", expectedItemCount.trim());
       }
+
+      updateUploadTask(taskId, {
+        status: 'extracting',
+        message: 'Extracting data from document...'
+      });
 
       const res = await authenticatedFetch("/po/upload", {
         method: "POST",
@@ -494,7 +503,6 @@ function DashboardPage() {
             rawText = await res.text();
           }
         } catch {
-          // If parsing fails, attempt best-effort text read
           try {
             rawText = await res.text();
           } catch {
@@ -502,7 +510,6 @@ function DashboardPage() {
           }
         }
 
-        // Prefer the more specific backend "error" field when present.
         const message =
           (typeof errorData?.message === "string" && errorData.message.trim()) ? errorData.message.trim() : "";
         const detail =
@@ -514,37 +521,27 @@ function DashboardPage() {
             ? `${message}: ${detail}`
             : (detail || message || fallbackText || `Upload failed (${res.status})`);
 
-        console.error("PO upload failed:", {
-          status: res.status,
-          statusText: res.statusText,
-          errorData,
-          rawText,
-        });
-
         throw new Error(errorMessage);
       }
 
-      // We don't auto-navigate for each file; just ensure the PO list is refreshed after all uploads.
+      updateUploadTask(taskId, {
+        status: 'saving',
+        message: 'Saving to database...'
+      });
+
       await res.json();
-    };
 
-    try {
-      setUploadProgress({
-        stage: 'extracting',
-        message: 'Processing document extraction for all files... This may take a minute.',
+      updateUploadTask(taskId, {
+        status: 'complete',
+        message: 'Upload complete!'
       });
 
-      await Promise.all(files.map((file) => uploadSingleFile(file)));
+      // Auto-remove successful uploads after 5 seconds
+      setTimeout(() => {
+        removeUploadTask(taskId);
+      }, 5000);
 
-      setUploadProgress({
-        stage: 'complete',
-        message: fileCount > 1 ? 'All POs uploaded successfully!' : 'Upload successful!',
-      });
-
-      // Small delay to show success message
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Refresh the grid to show newly uploaded POs
+      // Refresh grid to show new PO
       refreshGrid();
     } catch (err) {
       console.error("Upload error:", err);
@@ -560,22 +557,74 @@ function DashboardPage() {
         errorDetail = 'The extraction service returned an error. The FastAPI service may be down or overloaded.';
       }
 
-      setUploadProgress({
-        stage: 'error',
+      updateUploadTask(taskId, {
+        status: 'error',
         message: 'Upload failed',
-        error: errorDetail,
+        error: errorDetail
       });
-    } finally {
-      setUploading(false);
-      // Don't reset uploadProgress here - let user see the error/success state
-      e.target.value = "";
     }
   };
 
-  const closeProgressModal = () => {
-    setUploadProgress(null);
+  const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    if (!pendingClientSelection) {
+      alert("Select a client before uploading.");
+      return;
+    }
+    // Basic validation for expected items (optional but recommended)
+    const trimmedExpected = expectedItems.trim();
+    if (trimmedExpected) {
+      const num = Number(trimmedExpected);
+      if (!Number.isInteger(num) || num <= 0) {
+        alert("Expected number of items must be a positive whole number.");
+        return;
+      }
+    }
+    
+    // Create upload tasks for each file
+    const newTasks: UploadTask[] = files.map(file => ({
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      fileName: file.name,
+      status: 'uploading' as UploadStatus,
+      message: 'Preparing upload...',
+      startTime: Date.now()
+    }));
+
+    setUploadTasks(prev => [...prev, ...newTasks]);
+    setShowUploadPanel(true);
+
+    // Store current client selection for this batch
+    const currentClientSelection = { ...pendingClientSelection };
+    const currentExpectedItems = expectedItems;
+
+    // Reset the form
+    e.target.value = "";
     resetClientSelection();
+
+    // Start uploads in parallel (background)
+    newTasks.forEach((task, index) => {
+      uploadSingleFile(files[index], task.id, currentClientSelection, currentExpectedItems);
+    });
   };
+
+  const closeUploadTask = (taskId: string) => {
+    removeUploadTask(taskId);
+    // If no more tasks, hide the panel
+    if (uploadTasks.length <= 1) {
+      setShowUploadPanel(false);
+    }
+  };
+
+  const clearAllCompletedTasks = () => {
+    setUploadTasks(prev => prev.filter(task => 
+      task.status !== 'complete' && task.status !== 'error'
+    ));
+  };
+
+  const hasActiveTasks = uploadTasks.some(task => 
+    task.status === 'uploading' || task.status === 'extracting' || task.status === 'saving'
+  );
 
   const handleDeletePO = async () => {
     if (!showDeleteConfirm) return;
@@ -700,10 +749,10 @@ function DashboardPage() {
                 />
                 <button 
                   onClick={onUploadClick} 
-                  disabled={uploading}
+                  disabled={hasActiveTasks}
                   className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium shadow-md hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 flex items-center gap-2"
                 >
-                  {uploading ? (
+                  {hasActiveTasks ? (
                     <>
                       <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -795,6 +844,149 @@ function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Background Upload Panel */}
+      {uploadTasks.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-96 max-h-[600px] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <h3 className="font-semibold text-slate-900">
+                  Uploads ({uploadTasks.length})
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {!hasActiveTasks && uploadTasks.length > 0 && (
+                  <button
+                    onClick={clearAllCompletedTasks}
+                    className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                  >
+                    Clear all
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowUploadPanel(false)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Upload Tasks List */}
+            <div className="overflow-y-auto max-h-[500px]">
+              {uploadTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="px-4 py-3 border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Status Icon */}
+                    <div className="shrink-0 mt-1">
+                      {task.status === 'complete' ? (
+                        <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      ) : task.status === 'error' ? (
+                        <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                          <svg className="animate-spin w-4 h-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Task Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate" title={task.fileName}>
+                        {task.fileName}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {task.message}
+                      </p>
+                      {task.error && (
+                        <p className="text-xs text-red-600 mt-1 bg-red-50 rounded px-2 py-1">
+                          {task.error}
+                        </p>
+                      )}
+                      {task.status !== 'complete' && task.status !== 'error' && (
+                        <div className="mt-2 w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                          <div 
+                            className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                            style={{ 
+                              width: task.status === 'uploading' ? '33%' : 
+                                     task.status === 'extracting' ? '66%' : 
+                                     task.status === 'saving' ? '90%' : '0%'
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Close Button */}
+                    {(task.status === 'complete' || task.status === 'error') && (
+                      <button
+                        onClick={() => closeUploadTask(task.id)}
+                        className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Upload Indicator (when panel is hidden) */}
+      {uploadTasks.length > 0 && !showUploadPanel && (
+        <button
+          onClick={() => setShowUploadPanel(true)}
+          className="fixed bottom-6 right-6 z-50 bg-white rounded-full shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 hover:shadow-xl transition-all hover:scale-105"
+        >
+          {hasActiveTasks ? (
+            <>
+              <svg className="animate-spin w-5 h-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-sm font-medium text-slate-900">
+                {uploadTasks.filter(t => t.status === 'uploading' || t.status === 'extracting' || t.status === 'saving').length} uploading...
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-slate-900">
+                {uploadTasks.filter(t => t.status === 'complete').length} completed
+              </span>
+            </>
+          )}
+        </button>
+      )}
 
       {/* Client selection dialog */}
       {clientModalOpen && (
@@ -991,161 +1183,6 @@ function DashboardPage() {
                 Continue & upload PO
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Upload Progress Modal */}
-      {uploadProgress && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 border border-slate-200">
-            {uploadProgress.stage === 'error' ? (
-              <>
-                <div className="flex items-start gap-4 mb-6">
-                  <div className="shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-xl font-bold text-slate-900 mb-2">Upload Failed</h2>
-                    <p className="text-slate-700 mb-3">{uploadProgress.message}</p>
-                    {uploadProgress.error && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
-                        {uploadProgress.error}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                  <button
-                    onClick={closeProgressModal}
-                    className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </>
-            ) : uploadProgress.stage === 'complete' ? (
-              <>
-                <div className="flex items-start gap-4 mb-6">
-                  <div className="shrink-0 w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-xl font-bold text-slate-900 mb-2">Upload Successful!</h2>
-                    <p className="text-slate-700">{uploadProgress.message}</p>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                  <button
-                    onClick={closeProgressModal}
-                    className="px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
-                  >
-                    Continue
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-start gap-4 mb-6">
-                  <div className="shrink-0">
-                    <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-xl font-bold text-slate-900 mb-2">Processing Purchase Order</h2>
-                    <p className="text-slate-700 mb-4">{uploadProgress.message}</p>
-                    
-                    {/* Progress Steps */}
-                    {(() => {
-                      const stage = uploadProgress.stage as 'uploading' | 'extracting' | 'saving' | 'complete' | 'error';
-                      const isUploading = stage === 'uploading';
-                      const isExtracting = stage === 'extracting';
-                      const isSaving = stage === 'saving';
-                      const isComplete = stage === 'complete';
-                      const isPastUploading = isExtracting || isSaving || isComplete;
-                      const isPastExtracting = isSaving || isComplete;
-                      
-                      const uploadOpacity = isUploading ? 'opacity-100' : isPastUploading ? 'opacity-60' : 'opacity-40';
-                      const uploadBg = isUploading ? 'bg-blue-600' : isPastUploading ? 'bg-green-600' : 'bg-slate-300';
-                      const uploadIcon = isUploading ? 'spinner' : isPastUploading ? 'check' : null;
-                      
-                      const extractOpacity = isExtracting ? 'opacity-100' : isPastExtracting ? 'opacity-60' : 'opacity-40';
-                      const extractBg = isExtracting ? 'bg-blue-600' : isPastExtracting ? 'bg-green-600' : 'bg-slate-300';
-                      const extractIcon = isExtracting ? 'spinner' : isPastExtracting ? 'check' : null;
-                      
-                      const saveOpacity = isSaving ? 'opacity-100' : isComplete ? 'opacity-60' : 'opacity-40';
-                      const saveBg = isSaving ? 'bg-blue-600' : isComplete ? 'bg-green-600' : 'bg-slate-300';
-                      const saveIcon = isComplete ? 'check' : isSaving ? 'spinner' : null;
-                      
-                      return (
-                        <div className="space-y-3 mt-4">
-                          <div className={`flex items-center gap-3 ${uploadOpacity}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${uploadBg}`}>
-                              {uploadIcon === 'check' ? (
-                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              ) : uploadIcon === 'spinner' ? (
-                                <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              ) : null}
-                            </div>
-                            <span className="text-sm text-slate-700">Uploading file to server</span>
-                          </div>
-                          
-                          <div className={`flex items-center gap-3 ${extractOpacity}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${extractBg}`}>
-                              {extractIcon === 'check' ? (
-                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              ) : extractIcon === 'spinner' ? (
-                                <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              ) : null}
-                            </div>
-                            <span className="text-sm text-slate-700">Extracting data from document</span>
-                          </div>
-                          
-                          <div className={`flex items-center gap-3 ${saveOpacity}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${saveBg}`}>
-                              {saveIcon === 'check' ? (
-                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              ) : saveIcon === 'spinner' ? (
-                                <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              ) : null}
-                            </div>
-                            <span className="text-sm text-slate-700">Saving to database</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-                {uploadProgress.stage === 'extracting' && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-xs text-blue-800">
-                      <strong>Note:</strong> Document extraction can take 30-60 seconds depending on file size and complexity. Please wait...
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
           </div>
         </div>
       )}
