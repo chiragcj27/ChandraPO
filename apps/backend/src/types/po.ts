@@ -93,6 +93,7 @@ export interface POItemRecord {
   invoiceNumber: string;
   exportedToExcel: boolean;
   completedBy?: string | null; // User ID who marked as complete
+  isDeleted: boolean;
 }
 
 export interface PODocumentShape {

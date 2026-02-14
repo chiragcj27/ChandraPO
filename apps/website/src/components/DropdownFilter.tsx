@@ -1,17 +1,17 @@
 "use client";
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from "react";
-import type { IFilterComp, IFilterParams, IDoesFilterPassParams } from "ag-grid-community";
+import type { IFilterComp, IFilterParams } from "ag-grid-community";
 
 export interface DropdownFilterParams extends IFilterParams {
   values: string[];
+  onFilterChange?: (value: string | null) => void;
 }
 
 const DropdownFilter = forwardRef<IFilterComp, DropdownFilterParams>((params, ref) => {
   const [selectedValue, setSelectedValue] = React.useState<string>("");
   const filterActiveRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const fieldRef = useRef<string | undefined>(params.colDef.field);
 
   useImperativeHandle(ref, () => ({
     isFilterActive() {
@@ -35,14 +35,9 @@ const DropdownFilter = forwardRef<IFilterComp, DropdownFilterParams>((params, re
         filterActiveRef.current = false;
       }
     },
-    doesFilterPass(filterParams: IDoesFilterPassParams) {
-      if (!filterActiveRef.current || !selectedValue) {
-        return true;
-      }
-      const field = fieldRef.current;
-      if (!field) return true;
-      const cellValue = filterParams.data[field];
-      return String(cellValue) === String(selectedValue);
+    doesFilterPass() {
+      // Return true for all rows - filtering is done server-side
+      return true;
     },
     getModelAsString() {
       if (!filterActiveRef.current || !selectedValue) {
@@ -66,14 +61,25 @@ const DropdownFilter = forwardRef<IFilterComp, DropdownFilterParams>((params, re
     setSelectedValue(value);
     filterActiveRef.current = value !== "";
     
+    // Notify parent component of filter change
+    if (params.onFilterChange) {
+      params.onFilterChange(value || null);
+    }
+    
     // Notify AG Grid that the filter has changed
-    params.filterChangedCallback();
+    params.api.onFilterChanged();
   };
 
   const handleClear = () => {
     setSelectedValue("");
     filterActiveRef.current = false;
-    params.filterChangedCallback();
+    
+    // Notify parent component of filter change
+    if (params.onFilterChange) {
+      params.onFilterChange(null);
+    }
+    
+    params.api.onFilterChanged();
   };
 
   return (

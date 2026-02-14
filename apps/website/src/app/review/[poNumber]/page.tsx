@@ -53,6 +53,8 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
   const [showMarkCompleteConfirm, setShowMarkCompleteConfirm] = useState(false);
   const [missingFieldsList, setMissingFieldsList] = useState<string[]>([]);
   const blobUrlRef = useRef<string | null>(null);
+  // Track items completed during this review session
+  const [itemsCompletedInSession, setItemsCompletedInSession] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchPO = async () => {
@@ -244,6 +246,18 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
       ExportedToExcel: newIsIncomplete ? false : updatedItems[index].ExportedToExcel,
     };
     setItems(updatedItems);
+
+    // If marking as complete via toggle, track it in session
+    if (!newIsIncomplete) {
+      setItemsCompletedInSession(prev => new Set([...prev, index]));
+    } else {
+      // If marking as incomplete, remove from session tracking
+      setItemsCompletedInSession(prev => {
+        const updated = new Set([...prev]);
+        updated.delete(index);
+        return updated;
+      });
+    }
   };
 
   const handleUpdateItem = (index: number, item: POItem) => {
@@ -407,6 +421,9 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     };
     setItems(updatedItems);
 
+    // Track this item as completed in this session
+    setItemsCompletedInSession(prev => new Set([...prev, currentIndex]));
+
     // Close confirmation dialog if open
     setShowMarkCompleteConfirm(false);
     setMissingFieldsList([]);
@@ -420,18 +437,11 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
   const handleExportCompletedItems = async () => {
     if (!po || !items.length) return;
 
-    // Filter: only completed items that haven't been exported yet
-    const completedItems = items.filter((item) => 
-      !item.IsIncomplete && !(item.ExportedToExcel ?? false)
-    );
+    // Filter: ALL completed items (regardless of export status)
+    const completedItems = items.filter((item) => !item.IsIncomplete);
     
     if (completedItems.length === 0) {
-      const allCompleted = items.filter((item) => !item.IsIncomplete);
-      if (allCompleted.length === 0) {
-        alert("There are no completed items to export yet.");
-      } else {
-        alert("All completed items have already been exported. No new items to export.");
-      }
+      alert("There are no completed items to export yet.");
       return;
     }
 
@@ -481,7 +491,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
         item.ItemPoNo ?? "", // ItemPoNo
         item.ItemRefNo ?? "", // ItemRefNo
         item.StockType ?? "", // StockType
-        "", // MakeType - Always blank
+        "casting", // MakeType - Default value: casting
         item.CustomerProductionInstruction ?? "", // CustomerProductionInstruction
         item.SpecialRemarks ?? "", // SpecialRemarks
         item.DesignProductionInstruction ?? "", // DesignProductionInstruction
@@ -511,13 +521,104 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     xlsx.utils.book_append_sheet(workbook, worksheet, "Completed Items");
 
     const safePONumber = (po.PONumber || decodeURIComponent(poNumber)).replace(/[^\w\-]+/g, "_");
-    xlsx.writeFile(workbook, `${safePONumber}_completed_items.xlsx`);
+    xlsx.writeFile(workbook, `${safePONumber}_all_completed_items.xlsx`);
+  };
+
+  const handleExportSessionCompletedItems = async () => {
+    if (!po || !items.length) return;
+
+    // Filter: Only items completed in this review session
+    const sessionCompletedItems = items.filter((item, index) => 
+      !item.IsIncomplete && itemsCompletedInSession.has(index)
+    );
+    
+    if (sessionCompletedItems.length === 0) {
+      alert("No items have been completed in this review session yet.");
+      return;
+    }
+
+    const xlsx = await import("xlsx");
+
+    // Define column order as specified
+    const columnOrder = [
+      "SrNo",
+      "StyleCode",
+      "ItemSize",
+      "OrderQty",
+      "OrderItemPcs",
+      "Metal",
+      "Tone",
+      "ItemPoNo",
+      "ItemRefNo",
+      "StockType",
+      "MakeType",
+      "CustomerProductionInstruction",
+      "SpecialRemarks",
+      "DesignProductionInstruction",
+      "StampInstruction",
+      "OrderGroup",
+      "Certificate",
+      "SKUNo",
+      "Basestoneminwt",
+      "Basestonemaxwt",
+      "Basemetalminwt",
+      "Basemetalmaxwt",
+      "Productiondeliverydate",
+      "Expecteddeliverydate",
+      "", // Empty column
+      "SetPrice",
+      "StoneQuality"
+    ];
+
+    const exportRows = sessionCompletedItems.map((item, index) => {
+      // Create row data in the exact column order
+      const rowData: (string | number)[] = [
+        index + 1, // SrNo
+        item.VendorStyleCode ?? "", // StyleCode
+        item.ItemSize ?? "", // ItemSize
+        item.OrderQty ?? 0, // OrderQty
+        1, // OrderItemPcs - Default value 1
+        item.Metal ?? "", // Metal
+        item.Tone ?? "", // Tone
+        item.ItemPoNo ?? "", // ItemPoNo
+        item.ItemRefNo ?? "", // ItemRefNo
+        item.StockType ?? "", // StockType
+        "casting", // MakeType - Default value: casting
+        item.CustomerProductionInstruction ?? "", // CustomerProductionInstruction
+        item.SpecialRemarks ?? "", // SpecialRemarks
+        item.DesignProductionInstruction ?? "", // DesignProductionInstruction
+        item.StampInstruction ?? "", // StampInstruction
+        "", // OrderGroup - Not in data model
+        "", // Certificate - Not in data model
+        "", // SKUNo - Not in data model
+        "", // Basestoneminwt - Not in data model
+        "", // Basestonemaxwt - Not in data model
+        "", // Basemetalminwt - Not in data model
+        "", // Basemetalmaxwt - Not in data model
+        "", // Productiondeliverydate - Not in data model
+        "", // Expecteddeliverydate - Not in data model
+        "", // Empty column
+        "", // SetPrice - Not in data model
+        "", // StoneQuality - Not in data model
+      ];
+      return rowData;
+    });
+
+    // Create worksheet with headers and data in correct order
+    const worksheet = xlsx.utils.aoa_to_sheet([
+      columnOrder, // Header row
+      ...exportRows // Data rows
+    ]);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, "Completed Items");
+
+    const safePONumber = (po.PONumber || decodeURIComponent(poNumber)).replace(/[^\w\-]+/g, "_");
+    xlsx.writeFile(workbook, `${safePONumber}_session_completed_items.xlsx`);
 
     // Mark exported items as exportedToExcel: true
     const updatedItems = [...items];
-    const exportedItemIndices = new Set<number>();
     
-    completedItems.forEach((exportedItem) => {
+    sessionCompletedItems.forEach((exportedItem) => {
       const index = items.findIndex((item) => 
         item.VendorStyleCode === exportedItem.VendorStyleCode &&
         item.ItemRefNo === exportedItem.ItemRefNo &&
@@ -525,7 +626,6 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
         !item.IsIncomplete
       );
       if (index !== -1) {
-        exportedItemIndices.add(index);
         updatedItems[index] = {
           ...updatedItems[index],
           ExportedToExcel: true,
@@ -637,10 +737,38 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     return email;
   };
 
-  const handleGenerateEmail = () => {
+  const handleGenerateEmail = async () => {
     const content = generateEmailContent();
     setEmailContent(content);
     setIsEmailDialogOpen(true);
+
+    // Increment the reminder count
+    if (!usingMock && po) {
+      try {
+        const updatedPO = {
+          ...po,
+          ClientReminderCount: (po.ClientReminderCount ?? 0) + 1,
+        };
+
+        const res = await authenticatedFetch(`/po/${po.PONumber}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedPO),
+        });
+
+        if (res.ok) {
+          const updatedData: PurchaseOrder = await res.json();
+          setPo(updatedData);
+          console.log("Reminder count incremented successfully");
+        } else {
+          console.error("Failed to increment reminder count");
+        }
+      } catch (error) {
+        console.error("Error incrementing reminder count:", error);
+      }
+    }
   };
 
   const handleDeletePO = async () => {
@@ -1097,16 +1225,30 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
                     </button>
                   )}
                   {!isAddingNewItem && completedCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleExportCompletedItems}
-                      className="px-4 py-2 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Export Excel
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleExportCompletedItems}
+                        className="px-4 py-2 rounded-lg border border-purple-300 bg-purple-50 text-purple-700 text-sm font-medium hover:bg-purple-100 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Export All Completed
+                      </button>
+                      {itemsCompletedInSession.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleExportSessionCompletedItems}
+                          className="px-4 py-2 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Export Session Completed ({itemsCompletedInSession.size})
+                        </button>
+                      )}
+                    </>
                   )}
                   {!isAddingNewItem && currentItem && (
                     <button

@@ -65,7 +65,7 @@ export async function sendDeliveryNotificationEmail(params: {
       console.error('[DeliveryEmail] Resend error:', error);
       return { success: false, error: error.message };
     }
-
+ 
     console.log(`[DeliveryEmail] Delivered notification sent for ${trackingId} to ${recipients.join(', ')}`);
     return { success: true };
   } catch (err: unknown) {

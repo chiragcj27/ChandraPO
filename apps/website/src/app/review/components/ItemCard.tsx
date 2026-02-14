@@ -310,6 +310,8 @@ export default function ItemCard({
             <option value="Pendant">Pendant</option>
             <option value="Necklace">Necklace</option>
             <option value="Bracelet">Bracelet</option>
+            <option value="Earings">Earings</option>
+            <option value="Bangle">Bangle</option>
           </select>
         </div>
 
@@ -342,6 +344,7 @@ export default function ItemCard({
             className={getInputClassName(item.StockType, "w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-slate-900")}
           >
             <option value="">Select stock type</option>
+            <option value="Normal">Normal</option>
             <option value="Studded Gold Jewellery IC">Studded Gold Jewellery IC</option>
             <option value="Studded Platinum Jewellery IC">Studded Platinum Jewellery IC</option>
             <option value="Plain Gold Jewellery IC">Plain Gold Jewellery IC</option>

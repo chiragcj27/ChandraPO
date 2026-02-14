@@ -14,6 +14,7 @@ interface PO {
     poFiles: File[];
     invoices: string[];
     clientReminderCount: number | null;
+    isDeleted: boolean;
 }
 
 const poSchema = new mongoose.Schema<PO>({
@@ -29,6 +30,7 @@ const poSchema = new mongoose.Schema<PO>({
     poFiles: { type: [fileSchema], required: true },
     invoices: { type: [String], required: true },
     clientReminderCount: { type: Number, default: 0 },
+    isDeleted: { type: Boolean, default: false },
 }, {
     timestamps: true,
 })

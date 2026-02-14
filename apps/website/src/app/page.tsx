@@ -30,6 +30,8 @@ type ClientRecord = {
 function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const gridApiRef = useRef<GridApi<PurchaseOrder> | null>(null);
+  const searchQueryRef = useRef<string>("");
+  const activeFiltersRef = useRef<{ clientName?: string; status?: string }>({});
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingPO, setDeletingPO] = useState<string | null>(null);
@@ -174,6 +176,24 @@ function DashboardPage() {
     [],
   );
 
+  const refreshGrid = useCallback(() => {
+    const api = gridApiRef.current as (GridApi<PurchaseOrder> & { refreshInfiniteCache?: () => void }) | null;
+    if (api?.refreshInfiniteCache) {
+      api.refreshInfiniteCache();
+    }
+  }, []);
+
+  // Callbacks for filter changes
+  const handleClientNameFilterChange = useCallback((value: string | null) => {
+    activeFiltersRef.current.clientName = value || undefined;
+    refreshGrid();
+  }, [refreshGrid]);
+
+  const handleStatusFilterChange = useCallback((value: string | null) => {
+    activeFiltersRef.current.status = value || undefined;
+    refreshGrid();
+  }, [refreshGrid]);
+
   const columnDefs = useMemo<ColDef<PurchaseOrder>[]>(
     () => [
       { 
@@ -200,6 +220,7 @@ function DashboardPage() {
         filter: DropdownFilter,
         filterParams: {
           values: clients.map(c => c.name).sort(),
+          onFilterChange: handleClientNameFilterChange,
         },
         width: 180,
         minWidth: 150,
@@ -236,6 +257,7 @@ function DashboardPage() {
         filter: DropdownFilter,
         filterParams: {
           values: ['New', 'In Review', 'Reviewed', 'Reviewed & Incomplete', 'Completed', 'Cancelled'],
+          onFilterChange: handleStatusFilterChange,
         },
         width: 160,
         minWidth: 140,
@@ -274,30 +296,45 @@ function DashboardPage() {
         cellRenderer: DeleteCellRenderer,
       } as ColDef<PurchaseOrder>] : []),
     ],
-    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, PONumberCellRenderer, TotalValueCellRenderer, isAdmin, clients]
+    [ActionCellRenderer, DeleteCellRenderer, IncompleteCellRenderer, StatusCellRenderer, PONumberCellRenderer, TotalValueCellRenderer, isAdmin, clients, handleClientNameFilterChange, handleStatusFilterChange]
   );
 
-  const refreshGrid = useCallback(() => {
-    const api = gridApiRef.current as (GridApi<PurchaseOrder> & { refreshInfiniteCache?: () => void }) | null;
-    if (api?.refreshInfiniteCache) {
-      api.refreshInfiniteCache();
-    }
-  }, []);
-
+  // Create datasource once - it reads from searchQueryRef so it doesn't need to be recreated
   const infiniteDatasource = useMemo(() => ({
     getRows: (params: {
       startRow: number;
       endRow: number;
       successCallback: (rows: PurchaseOrder[], lastRow?: number) => void;
       failCallback: () => void;
+      sortModel?: Array<{ colId: string; sort: 'asc' | 'desc' }>;
+      filterModel?: Record<string, { filter?: string; filterType?: string }>;
     }) => {
-      const { startRow, endRow, successCallback, failCallback } = params;
-      const search = searchQuery.trim() || undefined;
+      const { startRow, endRow, successCallback, failCallback, sortModel, filterModel } = params;
+      // Read search from ref so datasource doesn't need to be recreated when search changes
+      const search = searchQueryRef.current.trim() || undefined;
+      const filters = activeFiltersRef.current;
 
       const qp = new URLSearchParams();
       qp.set("startRow", String(startRow));
       qp.set("endRow", String(endRow));
       if (search) qp.set("search", search);
+      if (filters.clientName) qp.set("clientName", filters.clientName);
+      if (filters.status) qp.set("status", filters.status);
+      
+      // Add sort parameters
+      if (sortModel && sortModel.length > 0) {
+        qp.set("sortField", sortModel[0].colId);
+        qp.set("sortOrder", sortModel[0].sort);
+      }
+      
+      // Add PO number filter if present
+      if (filterModel?.PONumber) {
+        const poFilter = filterModel.PONumber;
+        if (poFilter.filter) {
+          qp.set("poNumber", poFilter.filter);
+        }
+      }
+      
       const endpoint = `/po?${qp.toString()}`;
 
       setLoading(true);
@@ -321,21 +358,26 @@ function DashboardPage() {
         })
         .finally(() => setLoading(false));
     },
-  }), [searchQuery]);
+  }), []); // Empty deps - datasource is created once and never changes
 
   const onGridReady = useCallback(
     (params: GridReadyEvent<PurchaseOrder>) => {
       gridApiRef.current = params.api;
+      // Set datasource once when grid is ready
       params.api.setGridOption("datasource", infiniteDatasource);
     },
     [infiniteDatasource],
   );
 
-  // Update datasource when search changes (grid may already be ready)
+  // When search changes, update the ref and refresh the grid cache
   useEffect(() => {
-    if (!gridApiRef.current) return;
-    gridApiRef.current.setGridOption("datasource", infiniteDatasource);
-  }, [infiniteDatasource]);
+    searchQueryRef.current = searchQuery;
+    
+    // Only refresh if grid is already initialized
+    if (gridApiRef.current) {
+      refreshGrid();
+    }
+  }, [searchQuery, refreshGrid]);
 
   // Load clients on mount for admins
   useEffect(() => {
