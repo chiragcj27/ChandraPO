@@ -6,7 +6,9 @@
 
 Set the following environment variables in your Render service dashboard:
 
-- `GOOGLE_API_KEY` - Your Google Gemini API key (required)
+- **Extraction provider (choose one):**
+  - **OpenAI (default):** `OPENAI_API_KEY` - Your OpenAI API key. Uses `gpt-4o-mini`.
+  - **Gemini:** `EXTRACTION_PROVIDER=gemini` and `GOOGLE_API_KEY` - Your Google Gemini API key. Uses `gemini-2.5-flash`.
 - `PORT` - Automatically set by Render (do not override)
 - `CORS_ORIGIN` - Optional, defaults to "*" (set to your backend URL for production)
 
@@ -57,7 +59,7 @@ This error typically occurs when:
 
    **Solution**: 
    - Check Render logs for startup errors
-   - Verify `GOOGLE_API_KEY` is set correctly
+   - Verify `OPENAI_API_KEY` (openai) or `GOOGLE_API_KEY` (gemini) is set correctly for your chosen provider
    - Ensure all dependencies are installed
 
 3. **Incorrect URL**: Backend is using wrong FastAPI URL.

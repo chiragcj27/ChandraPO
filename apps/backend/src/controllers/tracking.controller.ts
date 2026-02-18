@@ -7,22 +7,25 @@ import { sendDeliveryNotificationEmail } from '../services/delivery-email.servic
 interface ExcelRow {
   trackingId?: string;
   provider?: string;
+  clientName?: string;
   'Tracking ID'?: string;
   'Provider'?: string;
+  'Client Name'?: string;
   'tracking id'?: string;
+  'client name'?: string;
   [key: string]: any;
 }
 
 /**
  * Parse Excel file and extract tracking IDs and providers
  */
-const parseExcelFile = (buffer: Buffer): Array<{ trackingId: string; provider: string }> => {
+const parseExcelFile = (buffer: Buffer): Array<{ trackingId: string; provider: string; clientName?: string }> => {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   const data: ExcelRow[] = XLSX.utils.sheet_to_json(worksheet);
 
-  const trackingData: Array<{ trackingId: string; provider: string }> = [];
+  const trackingData: Array<{ trackingId: string; provider: string; clientName?: string }> = [];
 
   for (const row of data) {
     // Try different column name variations
@@ -42,10 +45,19 @@ const parseExcelFile = (buffer: Buffer): Array<{ trackingId: string; provider: s
       row['PROVIDER'] ||
       'Malca-Amit'; // Default provider
 
+    const clientName =
+      row.clientName ||
+      row['Client Name'] ||
+      row['client name'] ||
+      row['ClientName'] ||
+      row['CLIENT_NAME'] ||
+      '';
+
     if (trackingId && trackingId.toString().trim()) {
       trackingData.push({
         trackingId: trackingId.toString().trim(),
         provider: provider.toString().trim() || 'Malca-Amit',
+        clientName: clientName ? String(clientName).trim() : undefined,
       });
     }
   }
@@ -118,7 +130,7 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
     };
 
     // Process each tracking ID
-    for (const { trackingId, provider } of trackingData) {
+    for (const { trackingId, provider, clientName } of trackingData) {
       try {
         // Check if tracking already exists
         const existing = await Tracking.findOne({ trackingId });
@@ -137,6 +149,7 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
         await Tracking.create({
           trackingId,
           provider,
+          clientName: clientName || undefined,
           latestStatus,
           statusHistory,
           isActive,
@@ -182,6 +195,7 @@ export const getAllTrackings = async (req: Request, res: Response) => {
         id: t._id,
         trackingId: t.trackingId,
         provider: t.provider,
+        clientName: t.clientName,
         latestStatus: t.latestStatus,
         statusHistory: t.statusHistory || [], // Include status history
         isActive: t.isActive,
@@ -214,6 +228,7 @@ export const getTrackingDetails = async (req: Request, res: Response) => {
       id: tracking._id,
       trackingId: tracking.trackingId,
       provider: tracking.provider,
+      clientName: (tracking as any).clientName,
       latestStatus: tracking.latestStatus,
       statusHistory: tracking.statusHistory,
       isActive: tracking.isActive,
@@ -280,6 +295,7 @@ export const refreshTracking = async (req: Request, res: Response) => {
         id: tracking._id,
         trackingId: tracking.trackingId,
         provider: tracking.provider,
+        clientName: (tracking as any).clientName,
         latestStatus: tracking.latestStatus,
         statusHistory: tracking.statusHistory,
         isActive: tracking.isActive,
@@ -312,6 +328,7 @@ export const deleteTracking = async (req: Request, res: Response) => {
         id: tracking._id,
         trackingId: tracking.trackingId,
         provider: tracking.provider,
+        clientName: (tracking as any).clientName,
       },
     });
   } catch (error: any) {

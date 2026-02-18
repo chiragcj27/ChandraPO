@@ -9,6 +9,7 @@ export interface TrackingStatus {
 export interface Tracking {
   trackingId: string;
   provider: string;
+  clientName?: string;
   latestStatus: string;
   statusHistory: TrackingStatus[];
   isActive: boolean; // Stop tracking when delivered
@@ -25,6 +26,7 @@ const trackingStatusSchema = new mongoose.Schema<TrackingStatus>({
 const trackingSchema = new mongoose.Schema<Tracking>({
   trackingId: { type: String, required: true, unique: true, index: true },
   provider: { type: String, required: true },
+  clientName: { type: String },
   latestStatus: { type: String, required: true },
   statusHistory: { type: [trackingStatusSchema], default: [] },
   isActive: { type: Boolean, default: true, index: true },

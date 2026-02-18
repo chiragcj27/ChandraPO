@@ -1,18 +1,32 @@
-
-import os, json, re, tempfile
+import os
+import json
+import re
+import tempfile
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import google.generativeai as genai
 from dotenv import load_dotenv
 import pandas as pd
 
 load_dotenv()
-API_KEY = os.getenv("GOOGLE_API_KEY")
-if not API_KEY:
-    raise RuntimeError("Missing GOOGLE_API_KEY inside .env")
 
-genai.configure(api_key=API_KEY)
+# Extraction provider: "openai" (gpt-4o-mini) or "gemini" (gemini-2.5-flash). Switch via EXTRACTION_PROVIDER env.
+EXTRACTION_PROVIDER = os.getenv("EXTRACTION_PROVIDER", "openai").strip().lower()
+if EXTRACTION_PROVIDER not in ("openai", "gemini"):
+    EXTRACTION_PROVIDER = "openai"
+
+if EXTRACTION_PROVIDER == "gemini":
+    import google.generativeai as genai
+    API_KEY = os.getenv("GOOGLE_API_KEY")
+    if not API_KEY:
+        raise RuntimeError("EXTRACTION_PROVIDER=gemini requires GOOGLE_API_KEY in .env")
+    genai.configure(api_key=API_KEY)
+else:
+    from openai import OpenAI
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    if not OPENAI_API_KEY:
+        raise RuntimeError("EXTRACTION_PROVIDER=openai requires OPENAI_API_KEY in .env")
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI(title="Invoice Extraction API", version="1.0")
 
@@ -101,6 +115,46 @@ Output:
 - Do NOT include any markdown, explanation, or extra top-level keys other than the schema and optional "_debug_serials".
 """
 
+def _pdf_to_text(path: str) -> str:
+    """Extract text from PDF for OpenAI path (no file upload)."""
+    from pypdf import PdfReader
+    reader = PdfReader(path)
+    parts = []
+    for page in reader.pages:
+        parts.append(page.extract_text() or "")
+    return "\n\n".join(parts)
+
+
+def _run_extraction_openai(full_prompt: str) -> str:
+    """Run extraction using OpenAI gpt-4o-mini. Prompt should contain document text (PDF extracted or Excel)."""
+    resp = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": full_prompt}],
+        temperature=0.1,
+        response_format={"type": "json_object"},
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+
+def _run_extraction_gemini(full_prompt: str, genai_file) -> str:
+    """Run extraction using Gemini. genai_file is None for Excel (text-only)."""
+    model = genai.GenerativeModel("gemini-2.5-flash")
+    if genai_file is None:
+        response = model.generate_content(
+            full_prompt,
+            generation_config={"response_mime_type": "application/json"},
+        )
+    else:
+        response = model.generate_content(
+            [full_prompt, genai_file],
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.1,
+            },
+        )
+    return response.text.strip()
+
+
 def build_prompt(client_name_hint: str | None, mapping_text: str | None, expected_items: int | None) -> str:
     prompt_parts = [PROMPT_BASE.strip()]
     if client_name_hint:
@@ -128,7 +182,12 @@ async def health_check():
 
 @app.get("/")
 def home():
-    return {"status": "Invoice API running 🚀", "version": "1.0"}
+    return {
+        "status": "Invoice API running 🚀",
+        "version": "1.0",
+        "extraction_provider": EXTRACTION_PROVIDER,
+        "model": "gpt-4o-mini" if EXTRACTION_PROVIDER == "openai" else "gemini-2.5-flash",
+    }
 
 @app.post("/extract-invoice")
 async def extract_invoice(
@@ -168,62 +227,48 @@ async def extract_invoice(
         
         print(f"[FastAPI] Temporary file created: {tmp_path}")
 
-        model = genai.GenerativeModel("gemini-2.5-flash")
         prompt = build_prompt(client_name, mapping_text, expected_items)
-        
-        # Handle Excel files differently - convert to text and include in prompt
-        if suffix == '.xlsx' or suffix == '.xls':
+
+        # Handle Excel: convert to text and include in prompt (same for both providers)
+        if suffix == ".xlsx" or suffix == ".xls":
             print(f"[FastAPI] Converting Excel file to text format...")
             excel_content = ""
             try:
-                # Read all sheets from the Excel file
                 excel_file = pd.ExcelFile(tmp_path)
-                sheet_names = excel_file.sheet_names
-                
-                for sheet_name in sheet_names:
+                for sheet_name in excel_file.sheet_names:
                     df = pd.read_excel(excel_file, sheet_name=sheet_name)
                     excel_content += f"\n\n=== Sheet: {sheet_name} ===\n"
-                    # Convert DataFrame to CSV-like text representation
                     excel_content += df.to_csv(index=False, na_rep="")
-                
                 print(f"[FastAPI] Excel file converted to text (length: {len(excel_content)} chars)")
-                
-                # Add Excel content to prompt
-                file_type_context = "\n\nIMPORTANT: This is an Excel file. The file content is provided below as text. Read all worksheets, identify header rows, and extract all data rows as items. Pay special attention to column names and map them according to the mapping rules provided."
-                full_prompt = prompt + file_type_context + "\n\nExcel File Content:\n" + excel_content
-                
-                # Generate content without file upload
-                print(f"[FastAPI] Generating content with Gemini...")
-                response = model.generate_content(
-                    full_prompt,
-                    generation_config={
-                        # Ask the model to emit strict JSON
-                        "response_mime_type": "application/json",
-                    },
-                )
             except Exception as excel_error:
                 print(f"[FastAPI] Error reading Excel file: {excel_error}")
                 raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {str(excel_error)}")
+
+            file_type_context = "\n\nIMPORTANT: This is an Excel file. The file content is provided below as text. Read all worksheets, identify header rows, and extract all data rows as items. Pay special attention to column names and map them according to the mapping rules provided."
+            full_prompt = prompt + file_type_context + "\n\nExcel File Content:\n" + excel_content
+
+            if EXTRACTION_PROVIDER == "openai":
+                print(f"[FastAPI] Generating content with OpenAI gpt-4o-mini...")
+                raw = _run_extraction_openai(full_prompt)
+            else:
+                print(f"[FastAPI] Generating content with Gemini...")
+                raw = _run_extraction_gemini(full_prompt, None)
         else:
-            # For PDF files, upload to Gemini
-            print(f"[FastAPI] Uploading file to Gemini...")
-            gfile = genai.upload_file(tmp_path)
-            print(f"[FastAPI] File uploaded to Gemini: {gfile.name}")
-            
+            # PDF
             file_type_context = "\n\nIMPORTANT: This is a PDF file. Extract text and tables carefully, identifying the client name, PO number, date, and all item rows."
-            full_prompt = prompt + file_type_context
-            
-            # Generate content
-            print(f"[FastAPI] Generating content with Gemini...")
-            response = model.generate_content(
-                [full_prompt, gfile],
-                generation_config={
-                    # Ask the model to emit strict JSON
-                    "response_mime_type": "application/json",
-                    "temperature": 0.1,
-                },
-            )
-        raw = response.text.strip()
+            if EXTRACTION_PROVIDER == "openai":
+                print(f"[FastAPI] Extracting PDF text for OpenAI...")
+                pdf_text = _pdf_to_text(tmp_path)
+                full_prompt = prompt + file_type_context + "\n\nPDF content (extracted text):\n" + pdf_text
+                print(f"[FastAPI] Generating content with OpenAI gpt-4o-mini...")
+                raw = _run_extraction_openai(full_prompt)
+            else:
+                print(f"[FastAPI] Uploading file to Gemini...")
+                gfile = genai.upload_file(tmp_path)
+                print(f"[FastAPI] File uploaded to Gemini: {gfile.name}")
+                full_prompt = prompt + file_type_context
+                print(f"[FastAPI] Generating content with Gemini...")
+                raw = _run_extraction_gemini(full_prompt, gfile)
         print(f"[FastAPI] Content generated successfully (length: {len(raw)} chars)")
 
         # Parse JSON with resilience to markdown/code fences and common formatting issues
@@ -423,8 +468,8 @@ async def extract_invoice(
             except Exception as cleanup_error:
                 print(f"[FastAPI] Warning: Failed to clean up temp file {tmp_path}: {cleanup_error}")
         
-        # Clean up Gemini uploaded file if it exists
-        if gfile:
+        # Clean up Gemini uploaded file if it exists (only when using Gemini provider)
+        if gfile and EXTRACTION_PROVIDER == "gemini":
             try:
                 genai.delete_file(gfile.name)
                 print(f"[FastAPI] Gemini file deleted: {gfile.name}")

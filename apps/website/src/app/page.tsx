@@ -376,14 +376,17 @@ function DashboardPage() {
     [infiniteDatasource],
   );
 
-  // When search changes, update the ref and refresh the grid cache
+  const SEARCH_DEBOUNCE_MS = 500;
+
+  // When search changes, debounce before updating the ref and refreshing the grid (avoids an API call on every keystroke)
   useEffect(() => {
-    searchQueryRef.current = searchQuery;
-    
-    // Only refresh if grid is already initialized
-    if (gridApiRef.current) {
-      refreshGrid();
-    }
+    const t = setTimeout(() => {
+      searchQueryRef.current = searchQuery;
+      if (gridApiRef.current) {
+        refreshGrid();
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
   }, [searchQuery, refreshGrid]);
 
   // Load clients on mount for admins

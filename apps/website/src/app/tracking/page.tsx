@@ -15,6 +15,7 @@ interface Tracking {
   id: string;
   trackingId: string;
   provider: string;
+  clientName?: string;
   latestStatus: string;
   statusHistory: TrackingStatus[];
   isActive: boolean;
@@ -290,7 +291,7 @@ function TrackingPage() {
             </button>
           </div>
           <p className="text-sm text-slate-600">
-            Upload an Excel file (.xlsx, .xls) with columns: <strong>Tracking ID</strong> and <strong>Provider</strong>.
+            Upload an Excel file (.xlsx, .xls) with columns: <strong>Tracking ID</strong>, <strong>Provider</strong>, and <strong>Client Name</strong> (optional).
             Only unique tracking IDs will be added.
           </p>
           <input
@@ -341,10 +342,14 @@ function TrackingPage() {
                       <div key={tracking.id} className="hover:bg-slate-50 transition-colors">
                         {/* Main Row */}
                         <div className="p-6 flex items-center justify-between">
-                          <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
                             <div>
                               <div className="text-sm text-slate-500 mb-1">Tracking ID</div>
                               <div className="font-semibold text-slate-900">{tracking.trackingId}</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-slate-500 mb-1">Client Name</div>
+                              <div className="font-medium text-slate-700">{tracking.clientName || "—"}</div>
                             </div>
                             <div>
                               <div className="text-sm text-slate-500 mb-1">Provider</div>
@@ -507,10 +512,14 @@ function TrackingPage() {
                           <div key={tracking.id} className="hover:bg-slate-100 transition-colors">
                             {/* Main Row */}
                             <div className="p-6 flex items-center justify-between bg-slate-50">
-                              <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                              <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
                                 <div>
                                   <div className="text-sm text-slate-500 mb-1">Tracking ID</div>
                                   <div className="font-semibold text-slate-900">{tracking.trackingId}</div>
+                                </div>
+                                <div>
+                                  <div className="text-sm text-slate-500 mb-1">Client Name</div>
+                                  <div className="font-medium text-slate-700">{tracking.clientName || "—"}</div>
                                 </div>
                                 <div>
                                   <div className="text-sm text-slate-500 mb-1">Provider</div>
