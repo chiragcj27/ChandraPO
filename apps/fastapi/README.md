@@ -2,10 +2,10 @@
 
 Supports two extraction backends (switch via env):
 
-- **OpenAI (default)** – `gpt-4o-mini`, uses `OPENAI_API_KEY`
+- **OpenAI (default)** – `gpt-4o`, uses `OPENAI_API_KEY`
 - **Gemini** – `gemini-2.5-flash`, uses `GOOGLE_API_KEY`
 
-Set `EXTRACTION_PROVIDER=gemini` to use Gemini; omit or set `EXTRACTION_PROVIDER=openai` for OpenAI gpt-4o-mini.
+Set `EXTRACTION_PROVIDER=gemini` to use Gemini; omit or set `EXTRACTION_PROVIDER=openai` for OpenAI gpt-4o. In both cases the full PDF is sent to the model for extraction (no local text extraction).
 
 ## 🚀 Deployment on Render
 

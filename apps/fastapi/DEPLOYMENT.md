@@ -7,7 +7,7 @@
 Set the following environment variables in your Render service dashboard:
 
 - **Extraction provider (choose one):**
-  - **OpenAI (default):** `OPENAI_API_KEY` - Your OpenAI API key. Uses `gpt-4o-mini`.
+  - **OpenAI (default):** `OPENAI_API_KEY` - Your OpenAI API key. Uses `gpt-4o`.
   - **Gemini:** `EXTRACTION_PROVIDER=gemini` and `GOOGLE_API_KEY` - Your Google Gemini API key. Uses `gemini-2.5-flash`.
 - `PORT` - Automatically set by Render (do not override)
 - `CORS_ORIGIN` - Optional, defaults to "*" (set to your backend URL for production)

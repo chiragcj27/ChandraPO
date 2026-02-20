@@ -469,7 +469,15 @@ function DashboardPage() {
     clientSelection: { clientId?: string; clientName: string; clientMapping?: string },
     expectedItemCount: string
   ) => {
+    const log = (step: string, msg: string, extra?: Record<string, unknown>) => {
+      if (extra !== undefined) {
+        console.log(`[Upload] step=${step} file=${file.name} | ${msg}`, extra);
+      } else {
+        console.log(`[Upload] step=${step} file=${file.name} | ${msg}`);
+      }
+    };
     try {
+      log('1_start', 'Upload started', { client: clientSelection.clientName, expectedItems: expectedItemCount || 'none' });
       updateUploadTask(taskId, {
         status: 'uploading',
         message: 'Uploading to server...'
@@ -484,6 +492,7 @@ function DashboardPage() {
         form.append("expectedItems", expectedItemCount.trim());
       }
 
+      log('2_extract', 'Sending request to /po/upload (extraction)');
       updateUploadTask(taskId, {
         status: 'extracting',
         message: 'Extracting data from document...'
@@ -493,6 +502,8 @@ function DashboardPage() {
         method: "POST",
         body: form,
       });
+
+      log('3_response', 'Response received', { ok: res.ok, status: res.status });
 
       if (!res.ok) {
         const contentType = res.headers.get("content-type") || "";
@@ -527,12 +538,14 @@ function DashboardPage() {
         throw new Error(errorMessage);
       }
 
+      log('4_save', 'Saving to database...');
       updateUploadTask(taskId, {
         status: 'saving',
         message: 'Saving to database...'
       });
 
-      await res.json();
+      const json = await res.json();
+      log('5_done', 'Upload and extraction complete', { po: json?.po?.poNumber ?? 'unknown' });
 
       updateUploadTask(taskId, {
         status: 'complete',
@@ -547,7 +560,7 @@ function DashboardPage() {
       // Refresh grid to show new PO
       refreshGrid();
     } catch (err) {
-      console.error("Upload error:", err);
+      console.error(`[Upload] error file=${file.name} |`, err);
       const errorMessage = err instanceof Error ? err.message : "Upload failed. Please try again.";
 
       let errorDetail = errorMessage;

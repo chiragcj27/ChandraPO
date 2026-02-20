@@ -1,28 +1,40 @@
-// FastAPI Response Types
+// FastAPI Response Types (OpenAI PO extraction)
 export interface ExtractedLine {
-  VendorStyleCode: string;
-  Category: string;
-  ItemSize?: string | null;
-  OrderQty: number;
-  Metal: string;
-  Tone: string;
-  ItemPoNo: string;
-  ItemRefNo: string;
-  StockType?: string | null;
-  MakeType?: string | null;
-  CustomerProductionInstruction?: string | null;
-  SpecialRemarks?: string | null;
-  DesignProductionInstruction?: string | null;
-  StampInstruction?: string | null;
+  vendorStyleCode: string;
+  itemRefNo: string;
+  itemPoNo: string;
+  orderQty: number;
+  metal: string;
+  tone: string;
+  category: string;
+  stockType: string | null;
+  makeType: string | null;
+  customerProductionInstruction: string | null;
+  specialRemarks: string | null;
+  designProductionInstruction: string | null;
+  stampInstruction: string | null;
+  itemSize: string | null;
+  deadlineDate: string | null;
+  shippingDate: string | null;
+  invoiceNumber: string;
+  isIncomplete: boolean;
+}
+
+export interface ExtractedPO {
+  poNumber: string;
+  poDate: string;
+  clientName: string;
+  totalItems: number;
+  incompleteItems: number;
+  totalValue: number;
+  status: string; // Expected "PENDING" from FastAPI
 }
 
 export interface ExtractedPOResponse {
-  total_value: number;
-  client_name: string;
-  invoice_number: string;
-  total_entries: number;
-  invoice_date: string;
+  po: ExtractedPO;
   items: ExtractedLine[];
+  confidence: number;
+  needsReview: boolean;
 }
 
 // Database/API Types

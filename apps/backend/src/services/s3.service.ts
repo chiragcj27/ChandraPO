@@ -188,5 +188,29 @@ export const s3Service = {
       console.error("Error in getDigitalProductDownloadUrl:", error);
       throw error;
     }
+  },
+
+  /**
+   * Generate a signed download URL for an existing S3 file
+   * Used for FastAPI to download files without going through Render's load balancer
+   */
+  async getSignedDownloadUrl(key: string, bucket?: string, expiresIn: number = 600): Promise<string> {
+    try {
+      const targetBucket = bucket || process.env.AWS_S3_BUCKET || "";
+      if (!targetBucket) {
+        throw new Error("AWS_S3_BUCKET is not configured");
+      }
+
+      const command = new GetObjectCommand({
+        Bucket: targetBucket,
+        Key: key,
+      });
+
+      const signedUrl = await getSignedUrl(s3Client, command, { expiresIn });
+      return signedUrl;
+    } catch (error) {
+      console.error("Error in getSignedDownloadUrl:", error);
+      throw error;
+    }
   }
 }; 
