@@ -4,7 +4,7 @@ import path from 'path';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { File, PO, POItem, Client } from '@repo/db';
 import { s3Service } from '../services/s3.service';
-import { fastapiService } from '../services/fastapi.service';
+import { extractionService } from '../services/extraction.service';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import type {
   ExtractedLine,
@@ -768,8 +768,8 @@ export const uploadPO = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Extract purchase order data from FastAPI
-    const extraction = await fastapiService.extractPurchaseOrder(file, {
+    // Extract purchase order data using OpenAI
+    const extraction = await extractionService.extractPurchaseOrder(file, {
       clientName: selectedClientName ?? undefined,
       mappingText: mappingText ?? undefined,
       expectedItems,

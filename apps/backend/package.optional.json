@@ -1,0 +1,8 @@
+{
+  "name": "backend-optional-deps",
+  "description": "Optional dependencies for PDF vision mode. Install these after installing system dependencies.",
+  "dependencies": {
+    "canvas": "^2.11.2",
+    "pdfjs-dist": "^4.0.379"
+  }
+}
