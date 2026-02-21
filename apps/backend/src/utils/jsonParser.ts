@@ -205,7 +205,12 @@ function repairTruncatedJson(text: string, errorPosition: number): string {
   return truncated + closers;
 }
 
-export function parseJsonWithFallback(jsonText: string): any {
+export interface ParseJsonWithFallbackOptions {
+  /** Called when JSON was repaired from truncation (model hit token limit). Use to fail when partial data is unacceptable. */
+  onTruncationRepaired?: (recoveredItemCount: number) => void;
+}
+
+export function parseJsonWithFallback(jsonText: string, options?: ParseJsonWithFallbackOptions): any {
   try {
     return JSON.parse(jsonText);
   } catch (error) {
@@ -257,7 +262,9 @@ export function parseJsonWithFallback(jsonText: string): any {
       try {
         const repaired = repairTruncatedJson(jsonText, errorPosition);
         const parsed = JSON.parse(repaired);
-        console.log(`[Extraction] Recovered truncated JSON: kept ${(parsed?.items?.length ?? 0)} items`);
+        const itemCount = parsed?.items?.length ?? 0;
+        console.log(`[Extraction] Recovered truncated JSON: kept ${itemCount} items`);
+        options?.onTruncationRepaired?.(itemCount);
         return parsed;
       } catch (truncErr) {
         console.log(`[Extraction] Truncation repair failed: ${truncErr instanceof Error ? truncErr.message : String(truncErr)}`);
