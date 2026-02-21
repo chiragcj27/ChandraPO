@@ -13,7 +13,7 @@ dotenv.config();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const USE_PDF_IMAGES = process.env.USE_PDF_IMAGES !== 'true'; // Default to true
 // Optional: set EXTRACTION_MODEL=gpt-4o for better table/item accuracy (default gpt-4o-mini)
-const EXTRACTION_MODEL = (process.env.EXTRACTION_MODEL || 'gpt-4.1-mini').trim();
+const EXTRACTION_MODEL = (process.env.EXTRACTION_MODEL || 'gpt-5.2').trim();
 
 if (!OPENAI_API_KEY) {
   console.warn('[Extraction] WARNING: OPENAI_API_KEY not set. Extraction will fail.');
@@ -98,14 +98,23 @@ export const extractionService = {
               expectedItemsForChunk
             );
 
+            const totalExpected = options?.expectedItems;
+            const countConstraint =
+              expectedItemsForChunk != null
+                ? ` This chunk MUST contain exactly ${expectedItemsForChunk} items — no more, no less. Output exactly ${expectedItemsForChunk} entries in "items".`
+                : totalExpected != null
+                  ? ` The full document has exactly ${totalExpected} items total across all chunks. Extract only the item rows that appear on THESE pages (${range.startPage}-${range.endPage}); count serial numbers on these pages and output exactly that many items. Do not include header rows, subtotal rows, or blank rows as items.`
+                  : ` Extract only data rows (serial-numbered item rows); do not include header rows, subtotal rows, or blank rows as items.`;
+
             const chunkInstructions =
               `\n\nIMPORTANT — PDF extraction (Pages ${range.startPage}-${range.endPage}): ` +
               `This is a PDF file containing pages ${range.startPage} to ${range.endPage} of the original document. ` +
               `(1) Identify the client name, PO number, and date from the header (if present on these pages). ` +
               `(2) Locate the item table on these pages and identify the column headers. ` +
               `(3) For EVERY data row (each serial-numbered line), read each cell under the correct column and map to our schema using the client mapping. ` +
-              `Extract EVERY item row from these pages; do not skip rows. ` +
-              `For each item, use ONLY that row's cell values — do not copy or carry over values from other rows. ` +
+              `Extract every item row from these pages only; do not skip rows and do not add extra rows.` +
+              countConstraint +
+              ` For each item, use ONLY that row's cell values — do not copy or carry over values from other rows. ` +
               `ItemPoNo is the same for all items (from header); all other fields must come from the specific row only.`;
 
             // Convert PDF chunk to images for vision API
@@ -141,7 +150,7 @@ export const extractionService = {
               model: EXTRACTION_MODEL,
               messages: chunkMessages as any,
               temperature: 0.1,
-              max_tokens: 16384,
+              max_completion_tokens: 16384,
               response_format: { type: 'json_object' },
             });
 
@@ -190,6 +199,11 @@ export const extractionService = {
             items: allItems,
           };
 
+          if (options?.expectedItems != null && allItems.length !== options.expectedItems) {
+            console.warn(
+              `[Extraction] Expected ${options.expectedItems} items but combined extraction has ${allItems.length} items.`
+            );
+          }
           console.log(`[Extraction] Combined extraction: ${allItems.length} total items from ${pdfChunks.length} chunk(s)`);
           return combinedResponse;
         } else {
@@ -248,13 +262,13 @@ export const extractionService = {
 
       // Run extraction with OpenAI
       console.log(`[Extraction] Calling OpenAI API...`);
-      // Use high max_tokens so the full items array is returned (avoids truncation for large POs).
+      // Use high max_completion_tokens so the full items array is returned (avoids truncation for large POs).
       // gpt-4o-mini supports up to 16,384 output tokens; ~12k tokens ≈ 91 items, so 16k covers 100+ items.
       const response = await openai.chat.completions.create({
         model: EXTRACTION_MODEL,
         messages: messages as any,
         temperature: 0.1,
-        max_tokens: 16384,
+        max_completion_tokens: 16384,
         response_format: { type: 'json_object' },
       });
 

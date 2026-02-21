@@ -92,8 +92,9 @@ export function buildPrompt(
   if (expectedItems !== null && expectedItems !== undefined) {
     promptParts.push(
       `CRITICAL: This PO contains exactly ${expectedItems} items. ` +
-        `Your "items" array MUST have exactly ${expectedItems} entries. ` +
-        `Set "total_entries" to ${expectedItems}. Count carefully and match this number exactly.`
+        `Your "items" array MUST have exactly ${expectedItems} entries — no more, no less. ` +
+        `Set "total_entries" to ${expectedItems}. Count only data rows (serial-numbered item rows); do NOT include header rows, subtotal rows, or blank rows as items. ` +
+        `Match this number exactly.`
     );
   }
 
