@@ -55,6 +55,7 @@ function DashboardPage() {
   const [newClientMapping, setNewClientMapping] = useState("");
   const [pendingClientSelection, setPendingClientSelection] = useState<{ clientId?: string; clientName: string; clientMapping?: string } | null>(null);
   const [expectedItems, setExpectedItems] = useState<string>("");
+  const [pageRanges, setPageRanges] = useState<Array<{ startPage: number; endPage: number; expectedItems?: number }>>([]);
   const [editingMapping, setEditingMapping] = useState<string | null>(null);
   const [editedMapping, setEditedMapping] = useState<string>("");
   const [savingMapping, setSavingMapping] = useState(false);
@@ -428,6 +429,7 @@ function DashboardPage() {
     setNewClientName("");
     setNewClientMapping("");
     setExpectedItems("");
+    setPageRanges([]);
     setClientMode("existing");
     setEditingMapping(null);
     setEditedMapping("");
@@ -467,7 +469,8 @@ function DashboardPage() {
     file: File, 
     taskId: string,
     clientSelection: { clientId?: string; clientName: string; clientMapping?: string },
-    expectedItemCount: string
+    expectedItemCount: string,
+    pageRangesData?: Array<{ startPage: number; endPage: number; expectedItems?: number }>
   ) => {
     try {
       updateUploadTask(taskId, {
@@ -482,6 +485,10 @@ function DashboardPage() {
       if (clientSelection.clientMapping) form.append("clientMapping", clientSelection.clientMapping);
       if (expectedItemCount.trim()) {
         form.append("expectedItems", expectedItemCount.trim());
+      }
+      // Add page ranges if provided (only for PDF files)
+      if (pageRangesData && pageRangesData.length > 0 && file.name.toLowerCase().endsWith('.pdf')) {
+        form.append("pageRanges", JSON.stringify(pageRangesData));
       }
 
       updateUploadTask(taskId, {
@@ -600,6 +607,7 @@ function DashboardPage() {
     // Store current client selection for this batch
     const currentClientSelection = { ...pendingClientSelection };
     const currentExpectedItems = expectedItems;
+    const currentPageRanges = pageRanges.length > 0 ? [...pageRanges] : undefined;
 
     // Reset the form
     e.target.value = "";
@@ -607,7 +615,7 @@ function DashboardPage() {
 
     // Start uploads in parallel (background)
     newTasks.forEach((task, index) => {
-      uploadSingleFile(files[index], task.id, currentClientSelection, currentExpectedItems);
+      uploadSingleFile(files[index], task.id, currentClientSelection, currentExpectedItems, currentPageRanges);
     });
   };
 
@@ -1126,6 +1134,84 @@ function DashboardPage() {
                     Helps the AI ensure it extracts exactly this many item rows from the PO.
                   </p>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    PDF Page Ranges (optional - for PDF files only)
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Specify which pages contain which items. Example: Pages 1-3 for items 1-10, Pages 4-6 for items 11-20.
+                  </p>
+                  <div className="space-y-2">
+                    {pageRanges.map((range, index) => (
+                      <div key={index} className="flex gap-2 items-center p-2 bg-slate-50 rounded-lg">
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="Start"
+                          value={range.startPage || ''}
+                          onChange={(e) => {
+                            const newRanges = [...pageRanges];
+                            newRanges[index].startPage = Number(e.target.value) || 1;
+                            setPageRanges(newRanges);
+                          }}
+                          className="w-20 border border-slate-200 rounded px-2 py-1 text-sm"
+                        />
+                        <span className="text-slate-600">-</span>
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="End"
+                          value={range.endPage || ''}
+                          onChange={(e) => {
+                            const newRanges = [...pageRanges];
+                            newRanges[index].endPage = Number(e.target.value) || 1;
+                            setPageRanges(newRanges);
+                          }}
+                          className="w-20 border border-slate-200 rounded px-2 py-1 text-sm"
+                        />
+                        <span className="text-slate-600 text-xs">items:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="Expected"
+                          value={range.expectedItems || ''}
+                          onChange={(e) => {
+                            const newRanges = [...pageRanges];
+                            newRanges[index].expectedItems = e.target.value ? Number(e.target.value) : undefined;
+                            setPageRanges(newRanges);
+                          }}
+                          className="w-24 border border-slate-200 rounded px-2 py-1 text-sm"
+                        />
+                        <button
+                          onClick={() => {
+                            setPageRanges(pageRanges.filter((_, i) => i !== index));
+                          }}
+                          className="text-red-600 hover:text-red-700 px-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        setPageRanges([...pageRanges, { startPage: 1, endPage: 1 }]);
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Page Range
+                    </button>
+                  </div>
+                  {pageRanges.length > 0 && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Each page range will be processed separately and items will be combined into a single PO.
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1165,6 +1251,84 @@ function DashboardPage() {
                   <p className="mt-1 text-xs text-slate-500">
                     Helps the AI ensure it extracts exactly this many item rows from the PO.
                   </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    PDF Page Ranges (optional - for PDF files only)
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Specify which pages contain which items. Example: Pages 1-3 for items 1-10, Pages 4-6 for items 11-20.
+                  </p>
+                  <div className="space-y-2">
+                    {pageRanges.map((range, index) => (
+                      <div key={index} className="flex gap-2 items-center p-2 bg-slate-50 rounded-lg">
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="Start"
+                          value={range.startPage || ''}
+                          onChange={(e) => {
+                            const newRanges = [...pageRanges];
+                            newRanges[index].startPage = Number(e.target.value) || 1;
+                            setPageRanges(newRanges);
+                          }}
+                          className="w-20 border border-slate-200 rounded px-2 py-1 text-sm"
+                        />
+                        <span className="text-slate-600">-</span>
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="End"
+                          value={range.endPage || ''}
+                          onChange={(e) => {
+                            const newRanges = [...pageRanges];
+                            newRanges[index].endPage = Number(e.target.value) || 1;
+                            setPageRanges(newRanges);
+                          }}
+                          className="w-20 border border-slate-200 rounded px-2 py-1 text-sm"
+                        />
+                        <span className="text-slate-600 text-xs">items:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="Expected"
+                          value={range.expectedItems || ''}
+                          onChange={(e) => {
+                            const newRanges = [...pageRanges];
+                            newRanges[index].expectedItems = e.target.value ? Number(e.target.value) : undefined;
+                            setPageRanges(newRanges);
+                          }}
+                          className="w-24 border border-slate-200 rounded px-2 py-1 text-sm"
+                        />
+                        <button
+                          onClick={() => {
+                            setPageRanges(pageRanges.filter((_, i) => i !== index));
+                          }}
+                          className="text-red-600 hover:text-red-700 px-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        setPageRanges([...pageRanges, { startPage: 1, endPage: 1 }]);
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Page Range
+                    </button>
+                  </div>
+                  {pageRanges.length > 0 && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Each page range will be processed separately and items will be combined into a single PO.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

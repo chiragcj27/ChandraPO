@@ -15,6 +15,7 @@ import type {
   PurchaseOrderDTO,
   PurchaseOrderItemDTO,
 } from '../types/po';
+import type { PDFPageRange } from '../utils/pdfChunks';
 
 const normalizeDate = (value?: string | Date | null) => {
   if (!value) return undefined;
@@ -768,11 +769,35 @@ export const uploadPO = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Parse page ranges from request body (optional, for PDF chunked extraction)
+    let pageRanges: PDFPageRange[] | undefined;
+    if (req.body?.pageRanges && typeof req.body.pageRanges === 'string') {
+      try {
+        const parsed = JSON.parse(req.body.pageRanges);
+        if (Array.isArray(parsed)) {
+          pageRanges = parsed.map((range: any) => ({
+            startPage: Number(range.startPage) || 1,
+            endPage: Number(range.endPage) || 1,
+            expectedItems: range.expectedItems ? Number(range.expectedItems) : undefined,
+          })).filter((range: PDFPageRange) => 
+            range.startPage > 0 && range.endPage >= range.startPage
+          );
+          if (pageRanges.length === 0) {
+            pageRanges = undefined;
+          }
+        }
+      } catch (parseError) {
+        console.warn('[Upload] Failed to parse pageRanges:', parseError);
+        pageRanges = undefined;
+      }
+    }
+
     // Extract purchase order data using OpenAI
     const extraction = await extractionService.extractPurchaseOrder(file, {
       clientName: selectedClientName ?? undefined,
       mappingText: mappingText ?? undefined,
       expectedItems,
+      pageRanges,
     });
     const poPayload = await buildPOFromExtraction(extraction, fileMeta, selectedClientName ?? undefined);
 

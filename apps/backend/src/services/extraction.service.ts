@@ -6,13 +6,14 @@ import { extractTextFromExcel } from '../utils/excelExtractor';
 import { convertPDFToImages } from '../utils/pdfToImages';
 import { extractJson, parseJsonWithFallback } from '../utils/jsonParser';
 import { buildPrompt } from '../constants/extractionPrompt';
+import { extractPDFChunks, type PDFPageRange } from '../utils/pdfChunks';
 
 dotenv.config();
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const USE_PDF_IMAGES = process.env.USE_PDF_IMAGES !== 'true'; // Default to true
 // Optional: set EXTRACTION_MODEL=gpt-4o for better table/item accuracy (default gpt-4o-mini)
-const EXTRACTION_MODEL = (process.env.EXTRACTION_MODEL || 'gpt-4o').trim();
+const EXTRACTION_MODEL = (process.env.EXTRACTION_MODEL || 'gpt-4.1-mini').trim();
 
 if (!OPENAI_API_KEY) {
   console.warn('[Extraction] WARNING: OPENAI_API_KEY not set. Extraction will fail.');
@@ -27,7 +28,12 @@ const openai = OPENAI_API_KEY
 export const extractionService = {
   async extractPurchaseOrder(
     file: Express.Multer.File,
-    options?: { clientName?: string; mappingText?: string; expectedItems?: number },
+    options?: { 
+      clientName?: string; 
+      mappingText?: string; 
+      expectedItems?: number;
+      pageRanges?: PDFPageRange[]; // Page ranges for chunked extraction
+    },
   ): Promise<ExtractedPOResponse> {
     const startTime = Date.now();
 
@@ -54,7 +60,7 @@ export const extractionService = {
 
       let messages: Array<{ role: 'user'; content: any }>;
 
-      // Handle PDF files - use vision API with images ONLY (no text fallback)
+      // Handle PDF files - use vision API with PDF chunks directly
       if (suffix === '.pdf') {
         if (!USE_PDF_IMAGES) {
           throw new Error(
@@ -63,36 +69,162 @@ export const extractionService = {
           );
         }
 
-        console.log(`[Extraction] Converting PDF pages to images for vision model...`);
-        const pdfImages = await convertPDFToImages(file.buffer);
-        console.log(`[Extraction] Converted ${pdfImages.length} pages to images`);
+        // If page ranges are provided, use chunked extraction
+        if (options?.pageRanges && options.pageRanges.length > 0) {
+          console.log(`[Extraction] Using chunked PDF extraction with ${options.pageRanges.length} page range(s)`);
+          
+          // Extract PDF chunks for each page range
+          const pdfChunks = await extractPDFChunks(file.buffer, options.pageRanges);
+          console.log(`[Extraction] Created ${pdfChunks.length} PDF chunk(s)`);
 
-        // Build message with images for vision model
-        const pdfInstructions =
-          '\n\nIMPORTANT — PDF extraction: This is a PDF file. (1) Identify the client name, PO number, and date from the header. (2) Locate the item table on each page and identify the column headers. (3) For EVERY data row (each serial-numbered line), read each cell under the correct column and map to our schema using the client mapping. Extract EVERY item row across all pages; do not skip rows. For each item, use ONLY that row\'s cell values — do not copy or carry over values from other rows. ItemPoNo is the same for all items (from header); all other fields must come from the specific row only.';
-        const content: any[] = [
-          {
-            type: 'text',
-            text: prompt + pdfInstructions,
-          },
-        ];
+          // Process each chunk separately and combine results
+          const allItems: any[] = [];
+          let clientName: string | undefined;
+          let invoiceNumber: string | undefined;
+          let invoiceDate: string | undefined;
+          let totalValue = 0;
 
-        // Add all PDF pages as images
-        for (const image of pdfImages) {
-          content.push({
-            type: 'image_url',
-            image_url: {
-              url: `data:image/png;base64,${image.base64}`,
+          for (let i = 0; i < pdfChunks.length; i++) {
+            const chunk = pdfChunks[i];
+            const range = chunk.pages;
+            const expectedItemsForChunk = range.expectedItems;
+
+            console.log(`[Extraction] Processing chunk ${i + 1}/${pdfChunks.length}: pages ${range.startPage}-${range.endPage}${expectedItemsForChunk ? ` (expected items: ${expectedItemsForChunk})` : ''}`);
+
+            // Build prompt for this chunk
+            const chunkPrompt = buildPrompt(
+              options?.clientName,
+              options?.mappingText,
+              expectedItemsForChunk
+            );
+
+            const chunkInstructions =
+              `\n\nIMPORTANT — PDF extraction (Pages ${range.startPage}-${range.endPage}): ` +
+              `This is a PDF file containing pages ${range.startPage} to ${range.endPage} of the original document. ` +
+              `(1) Identify the client name, PO number, and date from the header (if present on these pages). ` +
+              `(2) Locate the item table on these pages and identify the column headers. ` +
+              `(3) For EVERY data row (each serial-numbered line), read each cell under the correct column and map to our schema using the client mapping. ` +
+              `Extract EVERY item row from these pages; do not skip rows. ` +
+              `For each item, use ONLY that row's cell values — do not copy or carry over values from other rows. ` +
+              `ItemPoNo is the same for all items (from header); all other fields must come from the specific row only.`;
+
+            // Convert PDF chunk to images for vision API
+            const chunkImages = await convertPDFToImages(chunk.buffer);
+            console.log(`[Extraction] Chunk ${i + 1} converted to ${chunkImages.length} image(s)`);
+
+            const chunkContent: any[] = [
+              {
+                type: 'text',
+                text: chunkPrompt + chunkInstructions,
+              },
+            ];
+
+            // Add all images from this PDF chunk
+            for (const image of chunkImages) {
+              chunkContent.push({
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/png;base64,${image.base64}`,
+                },
+              });
+            }
+
+            const chunkMessages = [
+              {
+                role: 'user' as const,
+                content: chunkContent,
+              },
+            ];
+
+            // Call OpenAI API for this chunk
+            const chunkResponse = await openai.chat.completions.create({
+              model: EXTRACTION_MODEL,
+              messages: chunkMessages as any,
+              temperature: 0.1,
+              max_tokens: 16384,
+              response_format: { type: 'json_object' },
+            });
+
+            const chunkRawResponse = chunkResponse.choices[0]?.message?.content?.trim() || '';
+            console.log(`[Extraction] Chunk ${i + 1} response received (${chunkRawResponse.length} chars)`);
+
+            // Parse JSON from chunk response
+            const chunkJsonText = extractJson(chunkRawResponse);
+            let chunkData: ExtractedPOResponse;
+            try {
+              chunkData = parseJsonWithFallback(chunkJsonText);
+            } catch (parseError) {
+              console.error(`[Extraction] JSON parsing failed for chunk ${i + 1}:`, parseError);
+              throw new Error(`Failed to parse JSON response for chunk ${i + 1}: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+            }
+
+            // Validate chunk response structure
+            if (!chunkData.items || !Array.isArray(chunkData.items)) {
+              throw new Error(`Invalid response for chunk ${i + 1}: items array is missing or invalid`);
+            }
+
+            // Collect metadata from first chunk (or update if found in later chunks)
+            if (!clientName && chunkData.client_name) {
+              clientName = chunkData.client_name;
+            }
+            if (!invoiceNumber && chunkData.invoice_number) {
+              invoiceNumber = chunkData.invoice_number;
+            }
+            if (!invoiceDate && chunkData.invoice_date) {
+              invoiceDate = chunkData.invoice_date;
+            }
+            totalValue += Number(chunkData.total_value) || 0;
+
+            // Add items from this chunk
+            allItems.push(...chunkData.items);
+            console.log(`[Extraction] Chunk ${i + 1} extracted ${chunkData.items.length} items`);
+          }
+
+          // Combine all chunks into a single response
+          const combinedResponse: ExtractedPOResponse = {
+            client_name: clientName || options?.clientName || 'Unknown Client',
+            invoice_number: invoiceNumber || '',
+            invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+            total_value: totalValue,
+            total_entries: allItems.length,
+            items: allItems,
+          };
+
+          console.log(`[Extraction] Combined extraction: ${allItems.length} total items from ${pdfChunks.length} chunk(s)`);
+          return combinedResponse;
+        } else {
+          // Fallback to image-based extraction if no page ranges provided
+          console.log(`[Extraction] Converting PDF pages to images for vision model...`);
+          const pdfImages = await convertPDFToImages(file.buffer);
+          console.log(`[Extraction] Converted ${pdfImages.length} pages to images`);
+
+          // Build message with images for vision model
+          const pdfInstructions =
+            '\n\nIMPORTANT — PDF extraction: This is a PDF file. (1) Identify the client name, PO number, and date from the header. (2) Locate the item table on each page and identify the column headers. (3) For EVERY data row (each serial-numbered line), read each cell under the correct column and map to our schema using the client mapping. Extract EVERY item row across all pages; do not skip rows. For each item, use ONLY that row\'s cell values — do not copy or carry over values from other rows. ItemPoNo is the same for all items (from header); all other fields must come from the specific row only.';
+          const content: any[] = [
+            {
+              type: 'text',
+              text: prompt + pdfInstructions,
             },
-          });
-        }
+          ];
 
-        messages = [
-          {
-            role: 'user',
-            content: content,
-          },
-        ];
+          // Add all PDF pages as images
+          for (const image of pdfImages) {
+            content.push({
+              type: 'image_url',
+              image_url: {
+                url: `data:image/png;base64,${image.base64}`,
+              },
+            });
+          }
+
+          messages = [
+            {
+              role: 'user',
+              content: content,
+            },
+          ];
+        }
       } else {
         // Excel file - use text extraction
         console.log(`[Extraction] Converting Excel file to text format...`);
