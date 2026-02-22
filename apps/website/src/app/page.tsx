@@ -1002,8 +1002,8 @@ function DashboardPage() {
       {/* Client selection dialog */}
       {clientModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 border border-slate-200">
-            <div className="flex justify-between items-start mb-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex justify-between items-start mb-4 shrink-0">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Choose client mapping</h2>
                 <p className="text-slate-600 text-sm mt-1">
@@ -1022,7 +1022,7 @@ function DashboardPage() {
               </button>
             </div>
 
-            <div className="flex gap-4 mb-4">
+            <div className="flex gap-4 mb-4 shrink-0">
               <button
                 className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                   clientMode === "existing"
@@ -1045,6 +1045,7 @@ function DashboardPage() {
               </button>
             </div>
 
+            <div className="overflow-y-auto min-h-0 flex-1 pr-1">
             {clientMode === "existing" ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1332,8 +1333,9 @@ function DashboardPage() {
                 </div>
               </div>
             )}
+            </div>
 
-            <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-slate-200">
+            <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-slate-200 shrink-0">
               <button
                 onClick={() => {
                   setClientModalOpen(false);

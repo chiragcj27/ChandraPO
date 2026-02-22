@@ -25,6 +25,90 @@ const openai = OPENAI_API_KEY
     })
   : null;
 
+/**
+ * When extraction count doesn't match expected, ask the LLM to correct:
+ * remove duplicates / header / subtotal rows and return exactly expectedCount items.
+ * Preserves header fields (client_name, invoice_number, etc.) from the original response.
+ */
+async function correctExtractionCount(
+  openaiClient: OpenAI,
+  current: ExtractedPOResponse,
+  expectedCount: number
+): Promise<ExtractedPOResponse> {
+  const got = current.items?.length ?? 0;
+  console.log(`[Extraction] Correction pass: got ${got} items, expected ${expectedCount}. Asking LLM to fix.`);
+
+  const correctionPrompt = `You are given a JSON object that was extracted from a Purchase Order. The extraction has ${got} entries in "items", but the PO actually has exactly ${expectedCount} item rows.
+
+Your task:
+1. Identify and REMOVE any entries that are NOT real item rows: e.g. header row, column titles, subtotal/total rows, blank rows, or duplicate rows (same VendorStyleCode + OrderQty + key fields as another row).
+2. If there are continuation rows (same serial number / same item split across lines), merge them into a single item using the most complete information.
+3. Keep only the real, distinct item rows. Preserve the exact order of items as they appear in the document.
+4. Output exactly ${expectedCount} items — no more, no less. Set "total_entries" to ${expectedCount}.
+5. Preserve client_name, invoice_number, invoice_date, total_value from the input. Only change the "items" array and "total_entries".
+
+Be accurate: do not remove real items. Prefer removing rows that look like headers, subtotals, or duplicates. When in doubt, keep rows that have valid VendorStyleCode and OrderQty and look like product lines.
+
+Return ONLY valid JSON matching this schema (same as input):
+{
+  "total_value": number | null,
+  "client_name": string,
+  "invoice_number": string,
+  "invoice_date": string,
+  "total_entries": number,
+  "items": [ { "VendorStyleCode", "Category", "ItemSize", "OrderQty", "Metal", "Tone", "ItemPoNo", "ItemRefNo", "StockType", "MakeType", "CustomerProductionInstruction", "SpecialRemarks", "DesignProductionInstruction", "StampInstruction" }, ... ]
+}
+
+Input JSON to correct:
+${JSON.stringify(current)}`;
+
+  const response = await openaiClient.chat.completions.create({
+    model: EXTRACTION_MODEL,
+    messages: [
+      { role: 'system', content: 'You correct PO extraction JSON so the items array has exactly the expected count. You remove duplicates and non-item rows only. Output valid JSON only.' },
+      { role: 'user', content: correctionPrompt },
+    ],
+    temperature: 0.1,
+    max_completion_tokens: MAX_OUTPUT_TOKENS,
+    response_format: { type: 'json_object' },
+  });
+
+  const raw = response.choices[0]?.message?.content?.trim() || '';
+  const jsonText = extractJson(raw);
+  let corrected: ExtractedPOResponse;
+  try {
+    corrected = JSON.parse(jsonText);
+  } catch (e) {
+    console.error('[Extraction] Correction pass: failed to parse LLM response as JSON');
+    throw new Error(
+      `Extraction count mismatch: expected ${expectedCount} but got ${got}. Correction pass failed (invalid JSON). Check "Expected number of items" or use chunked extraction.`
+    );
+  }
+
+  if (!corrected.items || !Array.isArray(corrected.items)) {
+    throw new Error(
+      `Extraction count mismatch: expected ${expectedCount} but got ${got}. Correction pass returned invalid structure.`
+    );
+  }
+
+  if (corrected.items.length !== expectedCount) {
+    throw new Error(
+      `Extraction count mismatch: expected ${expectedCount} but got ${got}. After correction pass still got ${corrected.items.length} items. Check "Expected number of items" or use chunked extraction.`
+    );
+  }
+
+  corrected.total_entries = corrected.items.length;
+  corrected.client_name = current.client_name || corrected.client_name;
+  corrected.invoice_number = current.invoice_number || corrected.invoice_number;
+  corrected.invoice_date = current.invoice_date || corrected.invoice_date;
+  if (typeof current.total_value === 'number' && !Number.isNaN(current.total_value)) {
+    corrected.total_value = current.total_value;
+  }
+
+  console.log(`[Extraction] Correction pass succeeded: ${corrected.items.length} items.`);
+  return corrected;
+}
+
 export const extractionService = {
   async extractPurchaseOrder(
     file: Express.Multer.File,
@@ -161,21 +245,31 @@ export const extractionService = {
               console.log(`[Extraction] Chunk ${i + 1} extracted ${chunkData.items.length} items`);
             }
 
+            // When count mismatch and expected is set, run correction pass (LLM removes duplicates/non-items)
+            let finalItems = allItems;
+            if (options?.expectedItems != null && allItems.length !== options.expectedItems) {
+              const combinedForCorrection: ExtractedPOResponse = {
+                client_name: clientName || options?.clientName || 'Unknown Client',
+                invoice_number: invoiceNumber || '',
+                invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+                total_value: totalValue,
+                total_entries: allItems.length,
+                items: allItems,
+              };
+              const corrected = await correctExtractionCount(openai, combinedForCorrection, options.expectedItems);
+              finalItems = corrected.items;
+            }
+
             const combinedResponse: ExtractedPOResponse = {
               client_name: clientName || options?.clientName || 'Unknown Client',
               invoice_number: invoiceNumber || '',
               invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
               total_value: totalValue,
-              total_entries: allItems.length,
-              items: allItems,
+              total_entries: finalItems.length,
+              items: finalItems,
             };
 
-            if (options?.expectedItems != null && allItems.length !== options.expectedItems) {
-              console.warn(
-                `[Extraction] Expected ${options.expectedItems} items but combined extraction has ${allItems.length} items.`
-              );
-            }
-            console.log(`[Extraction] Combined extraction: ${allItems.length} total items from ${pdfChunks.length} chunk(s)`);
+            console.log(`[Extraction] Combined extraction: ${finalItems.length} total items from ${pdfChunks.length} chunk(s)`);
             return combinedResponse;
           } finally {
             for (const fid of uploadedFileIds) {
@@ -246,11 +340,9 @@ export const extractionService = {
           console.log(`[Extraction] Extraction completed successfully in ${duration}s`);
           console.log(`[Extraction] Extracted ${data.items.length} items`);
 
-          if (options?.expectedItems && data.items.length !== options.expectedItems) {
-            console.warn(
-              `[Extraction] WARNING: Expected ${options.expectedItems} items but extracted ${data.items.length} items. ` +
-                `The PDF might have items on multiple pages or in tables that weren't fully captured.`
-            );
+          // When count mismatch and expected is set, run correction pass (LLM removes duplicates/non-items)
+          if (options?.expectedItems != null && data.items.length !== options.expectedItems) {
+            data = await correctExtractionCount(openai, data, options.expectedItems);
           }
 
           return data;
@@ -328,12 +420,9 @@ export const extractionService = {
       console.log(`[Extraction] Extraction completed successfully in ${duration}s`);
       console.log(`[Extraction] Extracted ${data.items.length} items`);
 
-      // Warn if expected items don't match
-      if (options?.expectedItems && data.items.length !== options.expectedItems) {
-        console.warn(
-          `[Extraction] WARNING: Expected ${options.expectedItems} items but extracted ${data.items.length} items. ` +
-            `The PDF might have items on multiple pages or in tables that weren't fully captured.`
-        );
+      // When count mismatch and expected is set, run correction pass (LLM removes duplicates/non-items)
+      if (options?.expectedItems != null && data.items.length !== options.expectedItems) {
+        data = await correctExtractionCount(openai, data, options.expectedItems);
       }
 
       return data;

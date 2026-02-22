@@ -159,7 +159,7 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
 
         // Notify when shipment is already delivered (e.g. from Excel upload)
         if (latestStatus.toLowerCase() === 'delivered') {
-          sendDeliveryNotificationEmail({ trackingId, provider, latestStatus }).catch((err) =>
+          sendDeliveryNotificationEmail({ trackingId, provider, latestStatus, clientName }).catch((err) =>
             console.error(`[Tracking] Delivery email failed for ${trackingId}:`, err)
           );
         }
@@ -284,6 +284,7 @@ export const refreshTracking = async (req: Request, res: Response) => {
         trackingId: tracking.trackingId,
         provider: tracking.provider,
         latestStatus,
+        clientName: (tracking as any).clientName,
       }).catch((err) =>
         console.error(`[Tracking] Delivery email failed for ${tracking.trackingId}:`, err)
       );

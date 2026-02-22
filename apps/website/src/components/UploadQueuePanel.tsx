@@ -52,8 +52,8 @@ export default function UploadQueuePanel() {
         </button>
 
         {open && (
-          <>
-            <div className="px-4 pb-3 flex items-center justify-between">
+          <div className="max-h-[min(420px,70vh)] overflow-y-auto flex flex-col">
+            <div className="px-4 pb-3 flex items-center justify-between shrink-0">
               <button
                 type="button"
                 onClick={clearCompleted}
@@ -64,7 +64,7 @@ export default function UploadQueuePanel() {
               <div className="text-xs text-slate-500">Runs up to 3 uploads at once</div>
             </div>
 
-            <div className="max-h-[320px] overflow-auto border-t border-slate-100">
+            <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-100">
               {jobs.slice(0, 8).map((job) => {
                 const isDone = job.status === "complete";
                 const isError = job.status === "error";
@@ -116,7 +116,7 @@ export default function UploadQueuePanel() {
                 );
               })}
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

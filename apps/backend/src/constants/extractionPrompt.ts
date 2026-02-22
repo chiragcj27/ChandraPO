@@ -91,9 +91,12 @@ export function buildPrompt(
 
   if (expectedItems !== null && expectedItems !== undefined) {
     promptParts.push(
-      `CRITICAL: This PO contains exactly ${expectedItems} items. ` +
+      `CRITICAL — EXACT ITEM COUNT: This PO contains exactly ${expectedItems} items. ` +
         `Your "items" array MUST have exactly ${expectedItems} entries — no more, no less. ` +
-        `Set "total_entries" to ${expectedItems}. Count only data rows (serial-numbered item rows); do NOT include header rows, subtotal rows, or blank rows as items. ` +
+        `Set "total_entries" to ${expectedItems}. ` +
+        `Count only DATA ROWS: each row with a serial number (Sr No / S.No) in the item table is ONE item. ` +
+        `Do NOT count: header row, column title row, subtotal/total rows, blank rows, or continuation/wrapped lines that belong to the same serial number. ` +
+        `If you count more than ${expectedItems} rows, you are including non-item rows — output only the first ${expectedItems} data rows in document order. ` +
         `Match this number exactly.`
     );
   }

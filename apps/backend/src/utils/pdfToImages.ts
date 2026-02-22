@@ -2,7 +2,7 @@
 // These must be set up at module load time, before any require() calls
 
 // Promise.withResolvers polyfill (Node.js 20 compatibility)
-if (typeof Promise.withResolvers === 'undefined') {
+if (typeof (Promise as any).withResolvers === 'undefined') {
   (Promise as any).withResolvers = function <T>() {
     let resolve!: (value: T | PromiseLike<T>) => void;
     let reject!: (reason?: any) => void;
@@ -16,9 +16,9 @@ if (typeof Promise.withResolvers === 'undefined') {
 
 // Promise.try polyfill (required by pdfjs-dist v5+)
 if (typeof (Promise as any).try === 'undefined') {
-  (Promise as any).try = function <T>(fn: () => T | Promise<T>, ...args: any[]): Promise<T> {
+  (Promise as any).try = function <T>(fn: () => T | Promise<T>): Promise<T> {
     try {
-      const result = fn.apply(null, args);
+      const result = fn();
       return Promise.resolve(result);
     } catch (error) {
       return Promise.reject(error);
