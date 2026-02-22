@@ -57,6 +57,7 @@ const updateTrackingStatus = async (tracking: any): Promise<void> => {
         trackingId: tracking.trackingId,
         provider: tracking.provider,
         latestStatus,
+        clientName: tracking.clientName,
       }).catch((err) =>
         console.error(`[Cron] Delivery email failed for ${tracking.trackingId}:`, err)
       );
