@@ -39,9 +39,9 @@ const updateTrackingStatus = async (tracking: any): Promise<void> => {
     }
 
     // Check if status is "delivered" - if so, mark as inactive
-    const isActive = latestStatus.toLowerCase() !== 'delivered';
+    const isNowDelivered = latestStatus.toLowerCase().includes('delivered');
     const wasDeliveredBefore = (tracking.latestStatus || '').toLowerCase().includes('delivered');
-    const isNowDelivered = !isActive;
+    const isActive = !isNowDelivered;
 
     // Update tracking record
     await Tracking.findByIdAndUpdate(tracking._id, {
@@ -103,9 +103,9 @@ const updateAllTrackings = async (): Promise<void> => {
  * Start the cron job to update tracking statuses every 6 hours
  */
 export const startTrackingCronJob = (): void => {
-  // Run every 6 hours: '0 */6 * * *'
-  // This runs at minute 0 of every 6th hour (00:00, 06:00, 12:00, 18:00)
-  const cronExpression = '0 */6 * * *';
+  // Run every 3 hours: '0 */3 * * *'
+  // This runs at minute 0 of every 3rd hour (00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00)
+  const cronExpression = '0 */3 * * *';
 
   console.log('Starting tracking cron job (runs every 6 hours)...');
 

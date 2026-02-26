@@ -143,7 +143,8 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
         const { latestStatus, statusHistory, deliveryDate } = await fetchAndUpdateTracking(trackingId, provider);
 
         // Determine if tracking should be active
-        const isActive = latestStatus.toLowerCase() !== 'delivered';
+        const isDelivered = latestStatus.toLowerCase().includes('delivered');
+        const isActive = !isDelivered;
 
         // Create new tracking record
         await Tracking.create({
@@ -158,7 +159,7 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
         });
 
         // Notify when shipment is already delivered (e.g. from Excel upload)
-        if (latestStatus.toLowerCase() === 'delivered') {
+        if (isDelivered) {
           sendDeliveryNotificationEmail({ trackingId, provider, latestStatus, clientName }).catch((err) =>
             console.error(`[Tracking] Delivery email failed for ${trackingId}:`, err)
           );
