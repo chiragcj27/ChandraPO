@@ -16,8 +16,9 @@ export async function uploadPdfToOpenAI(
   pdfBuffer: Buffer,
   filename: string
 ): Promise<string> {
+  const normalizedFilename = filename.replace(/\.pdf$/i, '.pdf');
   const file = await openai.files.create({
-    file: await toFile(pdfBuffer, filename, { type: 'application/pdf' }),
+    file: await toFile(pdfBuffer, normalizedFilename, { type: 'application/pdf' }),
     purpose: 'user_data',
   });
   return file.id;
