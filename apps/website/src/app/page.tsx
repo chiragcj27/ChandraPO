@@ -1347,7 +1347,8 @@ function DashboardPage() {
               </button>
               <button
                 onClick={handleClientConfirm}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                disabled={clientMode === "existing" ? !selectedClientId : !newClientName.trim()}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
               >
                 Continue & upload PO
               </button>
