@@ -135,6 +135,18 @@ export const uploadTrackingExcel = async (req: Request, res: Response) => {
         // Check if tracking already exists
         const existing = await Tracking.findOne({ trackingId });
         if (existing) {
+          // Still send delivery email for re-uploaded delivered shipments
+          const isDelivered = (existing.latestStatus || '').toLowerCase().includes('delivered');
+          if (isDelivered) {
+            sendDeliveryNotificationEmail({
+              trackingId,
+              provider: existing.provider,
+              latestStatus: existing.latestStatus,
+              clientName: (existing as any).clientName,
+            }).catch((err) =>
+              console.error(`[Tracking] Delivery email failed for ${trackingId}:`, err)
+            );
+          }
           results.skipped++;
           continue;
         }

@@ -9,6 +9,7 @@ interface ItemCardProps {
   totalItems: number;
   onToggleIncomplete: (index: number) => void;
   onUpdateItem: (index: number, item: POItem) => void;
+  onCopyPreviousItem?: (index: number) => void;
   onDeleteItem?: (index: number) => void;
   isNewItem?: boolean;
   onSaveNewItem?: () => void;
@@ -22,6 +23,7 @@ export default function ItemCard({
   totalItems,
   onToggleIncomplete,
   onUpdateItem,
+  onCopyPreviousItem,
   onDeleteItem,
   isNewItem = false,
   onSaveNewItem,
@@ -106,6 +108,19 @@ export default function ItemCard({
         </h3>
         {!readOnly && (
           <div className="flex items-center gap-3">
+            {onCopyPreviousItem && index > 0 && (
+              <button
+                type="button"
+                onClick={() => onCopyPreviousItem(index)}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors flex items-center gap-2 text-sm shadow-sm"
+                title="Copy values from previous item"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8M8 11h5M5 5a2 2 0 012-2h7l5 5v9a2 2 0 01-2 2H7a2 2 0 01-2-2V5z" />
+                </svg>
+                Copy Previous Item
+              </button>
+            )}
             {!isNewItem && (
               <>
                 <label className="flex items-center gap-3 cursor-pointer relative">
@@ -463,22 +478,6 @@ export default function ItemCard({
               })
             }
             className={getInputClassName(typeof item.ExpectedDeliveryDate === 'object' && item.ExpectedDeliveryDate instanceof Date ? item.ExpectedDeliveryDate.toISOString() : item.ExpectedDeliveryDate, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Invoice Number
-          </label>
-          <input
-            type="text"
-            value={item.InvoiceNumber || ""}
-            disabled={readOnly}
-            onChange={(e) =>
-              onUpdateItem(index, { ...item, InvoiceNumber: e.target.value })
-            }
-            className={getInputClassName(item.InvoiceNumber, "w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-slate-900")}
-            placeholder="Enter invoice number"
           />
         </div>
       </div>

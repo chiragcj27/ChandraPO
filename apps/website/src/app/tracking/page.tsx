@@ -32,13 +32,19 @@ function TrackingPage() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [expandedOverdueSection, setExpandedOverdueSection] = useState(false);
   const [refreshing, setRefreshing] = useState<string | null>(null);
+  const [refreshingStatuses, setRefreshingStatuses] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const fetchTrackings = async () => {
-    setLoading(true);
+  const fetchTrackings = async (options?: { showLoader?: boolean }) => {
+    const showLoader = options?.showLoader ?? true;
+
+    if (showLoader) {
+      setLoading(true);
+    }
+
     try {
       const res = await fetch(getApiEndpoint("/tracking"));
       if (!res.ok) {
@@ -46,7 +52,9 @@ function TrackingPage() {
         throw new Error(errorData.message || `Failed to load trackings: ${res.status} ${res.statusText}`);
       }
       const data = await res.json();
-      setTrackings(data.trackings || []);
+      const trackingsData: Tracking[] = data.trackings || [];
+      setTrackings(trackingsData);
+      return trackingsData;
     } catch (error) {
       console.error("Failed to fetch trackings", error);
       // Show error to user
@@ -54,13 +62,55 @@ function TrackingPage() {
         console.error("Error details:", error.message);
       }
       setTrackings([]);
+      return [];
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchTrackings();
+    const loadAndRefresh = async () => {
+      const trackingsData = await fetchTrackings();
+
+      if (!trackingsData || trackingsData.length === 0) {
+        return;
+      }
+
+      // On initial page load, refresh all active trackings so statuses are up to date
+      const activeTrackings = trackingsData.filter((t) => t.isActive);
+
+      if (activeTrackings.length === 0) {
+        return;
+      }
+
+      setRefreshingStatuses(true);
+      try {
+        for (const tracking of activeTrackings) {
+          try {
+            const res = await fetch(getApiEndpoint(`/tracking/${tracking.trackingId}/refresh`), {
+              method: "POST",
+            });
+
+            if (!res.ok) {
+              console.error(
+                `Failed to refresh tracking ${tracking.trackingId}: ${res.status} ${res.statusText}`
+              );
+            }
+          } catch (error) {
+            console.error(`Error refreshing tracking ${tracking.trackingId}`, error);
+          }
+        }
+
+      // After refreshing, reload the list without showing the main loading spinner again
+      await fetchTrackings({ showLoader: false });
+      } finally {
+        setRefreshingStatuses(false);
+      }
+    };
+
+    loadAndRefresh();
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -307,9 +357,20 @@ function TrackingPage() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-200">
             <h2 className="text-xl font-semibold text-slate-900">Tracking List</h2>
-            <p className="text-sm text-slate-600 mt-1">
-              {trackings.length} tracking{trackings.length !== 1 ? "s" : ""} found
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-sm text-slate-600">
+                {trackings.length} tracking{trackings.length !== 1 ? "s" : ""} found
+              </p>
+              {refreshingStatuses && (
+                <span className="inline-flex items-center gap-1.5 text-sm text-blue-600">
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Refreshing statuses…
+                </span>
+              )}
+            </div>
           </div>
 
           {loading ? (

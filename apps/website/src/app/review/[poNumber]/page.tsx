@@ -266,6 +266,39 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     setItems(updatedItems);
   };
 
+  const handleCopyPreviousItem = (index: number) => {
+    if (index === 0 || index >= items.length) return;
+
+    const source = items[index - 1];
+    const target = items[index];
+
+    const copiedItem: POItem = {
+      ...target,
+      VendorStyleCode: source.VendorStyleCode,
+      ItemRefNo: source.ItemRefNo,
+      ItemPoNo: source.ItemPoNo,
+      OrderQty: source.OrderQty,
+      Metal: source.Metal,
+      Tone: source.Tone,
+      Category: source.Category,
+      StockType: source.StockType ?? null,
+      MakeType: source.MakeType ?? null,
+      CustomerProductionInstruction: source.CustomerProductionInstruction ?? null,
+      SpecialRemarks: source.SpecialRemarks ?? null,
+      DesignProductionInstruction: source.DesignProductionInstruction ?? null,
+      StampInstruction: source.StampInstruction ?? null,
+      ItemSize: source.ItemSize ?? null,
+      ProductionDeliveryDate: source.ProductionDeliveryDate ?? null,
+      ExpectedDeliveryDate: source.ExpectedDeliveryDate ?? null,
+      InvoiceNumber: source.InvoiceNumber,
+      // When copying, treat the new item as not yet exported/completed
+      IsIncomplete: true,
+      ExportedToExcel: false,
+    };
+
+    handleUpdateItem(index, copiedItem);
+  };
+
   const createBlankItem = (): POItem => {
     return {
       IsIncomplete: true,
@@ -1201,6 +1234,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
                 totalItems={items.length}
                 onToggleIncomplete={handleToggleIncomplete}
                 onUpdateItem={handleUpdateItem}
+                onCopyPreviousItem={handleCopyPreviousItem}
                 onDeleteItem={isAdmin ? handleDeleteItem : undefined}
                 isNewItem={isAddingNewItem}
                 onSaveNewItem={handleSaveNewItem}
