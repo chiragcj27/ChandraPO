@@ -7,6 +7,9 @@ import nodemailer from 'nodemailer';
  * Required env:
  *   GMAIL_USER - Gmail address (e.g. your@gmail.com)
  *   GMAIL_APP_PASSWORD - Google App Password (create at myaccount.google.com → Security → App passwords)
+ *   DELIVERY_NOTIFY_EMAILS - Comma-separated recipient emails (takes precedence)
+ *
+ *   (Deprecated / fallback)
  *   DELIVERY_NOTIFY_EMAIL_1 - First recipient email
  *   DELIVERY_NOTIFY_EMAIL_2 - Second recipient email
  *
@@ -21,12 +24,23 @@ export async function sendDeliveryNotificationEmail(params: {
 }): Promise<{ success: boolean; error?: string }> {
   const gmailUser = process.env.GMAIL_USER;
   const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
-  const email1 = process.env.DELIVERY_NOTIFY_EMAIL_1;
-  const email2 = process.env.DELIVERY_NOTIFY_EMAIL_2;
+  const rawEmails = process.env.DELIVERY_NOTIFY_EMAILS;
 
-  const recipients: string[] = [email1, email2].filter(
-    (e): e is string => typeof e === 'string' && e.trim().length > 0
-  );
+  let recipients: string[] = [];
+
+  if (rawEmails && rawEmails.trim().length > 0) {
+    recipients = rawEmails
+      .split(/[,\n]/)
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
+  } else {
+    const email1 = process.env.DELIVERY_NOTIFY_EMAIL_1;
+    const email2 = process.env.DELIVERY_NOTIFY_EMAIL_2;
+
+    recipients = [email1, email2].filter(
+      (e): e is string => typeof e === 'string' && e.trim().length > 0
+    );
+  }
 
   if (!gmailUser || !gmailAppPassword) {
     console.warn(
@@ -37,7 +51,7 @@ export async function sendDeliveryNotificationEmail(params: {
 
   if (recipients.length === 0) {
     console.warn(
-      '[DeliveryEmail] No recipient emails (DELIVERY_NOTIFY_EMAIL_1, DELIVERY_NOTIFY_EMAIL_2), skipping'
+      '[DeliveryEmail] No recipient emails (DELIVERY_NOTIFY_EMAILS or DELIVERY_NOTIFY_EMAIL_1/2), skipping'
     );
     return { success: false, error: 'No recipient emails configured' };
   }
