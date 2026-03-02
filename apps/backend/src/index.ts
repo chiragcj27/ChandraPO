@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.routes';
 import trackingRoutes from './routes/tracking.routes';
 import { seedDefaultClients } from './seed/clients';
 import { startTrackingCronJob } from './services/tracking-cron.service';
+import { startShipmentReportCronJob } from './services/shipment-report-cron.service';
 
 dotenv.config();
 
@@ -45,6 +46,9 @@ const startServer = async () => {
 
   // Start tracking cron job
   startTrackingCronJob();
+
+  // Start daily shipment report cron job
+  startShipmentReportCronJob();
 
   app.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
