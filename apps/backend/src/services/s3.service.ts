@@ -1,6 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import dotenv from "dotenv";
 import path from "path";
 
@@ -24,7 +24,7 @@ export const s3Service = {
         throw new Error("AWS_S3_BUCKET is not configured");
       }
 
-      const key = `${folder}/${uuidv4()}-${fileName}`;
+      const key = `${folder}/${randomUUID()}-${fileName}`;
 
       const command = new PutObjectCommand({
         Bucket: bucket,
@@ -52,7 +52,7 @@ export const s3Service = {
       const region = process.env.AWS_REGION || "";
 
 
-      const key = `${folder}/${uuidv4()}-${fileName}`;
+      const key = `${folder}/${randomUUID()}-${fileName}`;
 
       const command = new PutObjectCommand({
         Bucket: bucket,
@@ -83,7 +83,7 @@ export const s3Service = {
         throw new Error("Private S3 bucket not configured");
       }
 
-      const key = `${folder}/${uuidv4()}-${fileName}`;
+      const key = `${folder}/${randomUUID()}-${fileName}`;
 
       const command = new PutObjectCommand({
         Bucket: bucket,
