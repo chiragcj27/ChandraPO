@@ -1,12 +1,11 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 /**
  * Send delivery notification email to 2 recipients when a shipment is marked delivered.
- * Uses Gmail SMTP configured via a Google account (App Password required).
+ * Uses Resend transactional email service.
  *
  * Required env:
- *   GMAIL_USER - Gmail address (e.g. your@gmail.com)
- *   GMAIL_APP_PASSWORD - Google App Password (create at myaccount.google.com → Security → App passwords)
+ *   RESEND_API_KEY - Resend API key
  *   DELIVERY_NOTIFY_EMAILS - Comma-separated recipient emails (takes precedence)
  *
  *   (Deprecated / fallback)
@@ -14,6 +13,7 @@ import nodemailer from 'nodemailer';
  *   DELIVERY_NOTIFY_EMAIL_2 - Second recipient email
  *
  * Optional:
+ *   RESEND_FROM_EMAIL - From email address (must be verified in Resend; falls back to GMAIL_USER)
  *   SMTP_FROM_NAME - Sender display name (default: Chandra Jewels Shipping)
  */
 export async function sendDeliveryNotificationEmail(params: {
@@ -22,8 +22,7 @@ export async function sendDeliveryNotificationEmail(params: {
   latestStatus?: string;
   clientName?: string;
 }): Promise<{ success: boolean; error?: string }> {
-  const gmailUser = process.env.GMAIL_USER;
-  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
+  const resendApiKey = process.env.RESEND_API_KEY;
   const rawEmails = process.env.DELIVERY_NOTIFY_EMAILS;
 
   let recipients: string[] = [];
@@ -42,13 +41,6 @@ export async function sendDeliveryNotificationEmail(params: {
     );
   }
 
-  if (!gmailUser || !gmailAppPassword) {
-    console.warn(
-      '[DeliveryEmail] GMAIL_USER or GMAIL_APP_PASSWORD not set, skipping delivery notification'
-    );
-    return { success: false, error: 'Gmail not configured (GMAIL_USER, GMAIL_APP_PASSWORD)' };
-  }
-
   if (recipients.length === 0) {
     console.warn(
       '[DeliveryEmail] No recipient emails (DELIVERY_NOTIFY_EMAILS or DELIVERY_NOTIFY_EMAIL_1/2), skipping'
@@ -56,17 +48,23 @@ export async function sendDeliveryNotificationEmail(params: {
     return { success: false, error: 'No recipient emails configured' };
   }
 
-  try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: gmailUser,
-        pass: gmailAppPassword,
-      },
-    });
+  if (!resendApiKey) {
+    console.warn(
+      '[DeliveryEmail] RESEND_API_KEY not set, skipping delivery notification'
+    );
+    return { success: false, error: 'Resend not configured (RESEND_API_KEY)' };
+  }
 
+  const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.GMAIL_USER;
+  if (!fromEmail) {
+    console.warn(
+      '[DeliveryEmail] RESEND_FROM_EMAIL (or fallback GMAIL_USER) not set, skipping delivery notification'
+    );
+    return { success: false, error: 'No from email configured (RESEND_FROM_EMAIL / GMAIL_USER)' };
+  }
+
+  try {
+    const resend = new Resend(resendApiKey);
     const { trackingId, provider = 'Malca-Amit', latestStatus = 'Delivered', clientName } = params;
     const fromName = process.env.SMTP_FROM_NAME || 'Chandra Jewels Shipping';
 
@@ -88,12 +86,20 @@ export async function sendDeliveryNotificationEmail(params: {
       <p>This is an automated notification from Chandra Jewels Shipment Tracking System.</p>
     `;
 
-    await transporter.sendMail({
-      from: `${fromName} <${gmailUser}>`,
-      to: recipients.join(', '),
+    const { error } = await resend.emails.send({
+      from: `${fromName} <${fromEmail}>`,
+      to: recipients,
       subject,
       html,
     });
+
+    if (error) {
+      console.error('[DeliveryEmail] Resend error:', error);
+      return {
+        success: false,
+        error: (error as { message?: string }).message ?? 'Failed to send via Resend',
+      };
+    }
 
     console.log(
       `[DeliveryEmail] Delivered notification sent for ${trackingId} to ${recipients.join(', ')}`
