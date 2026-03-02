@@ -1,12 +1,14 @@
 /**
- * Get the API base URL from environment variables.
- * Defaults to http://localhost:4000 if not set.
+ * Get the API base URL.
+ *
+ * We always go through the Next.js API proxy route `/api/backend`,
+ * which runs server-side (on Vercel or locally) and forwards requests
+ * to the actual backend server.
  */
 export function getApiUrl(): string {
-  // In Next.js, client-side environment variables must be prefixed with NEXT_PUBLIC_
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-  // Remove trailing slash if present
-  return apiUrl.replace(/\/$/, "");
+  // Always call our proxy route; it is same-origin and works in both
+  // local development and production on Vercel.
+  return "/api/backend";
 }
 
 /**
