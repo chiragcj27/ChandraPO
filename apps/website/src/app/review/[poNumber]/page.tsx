@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { PurchaseOrder, POItem } from "@/types/po";
 import ItemCard from "../components/ItemCard";
 import EmailDialog from "../components/EmailDialog";
-import { authenticatedFetch, getApiEndpoint } from "@/lib/api";
+import { authenticatedFetch, getApiEndpoint, createAuthenticatedFetchOptions } from "@/lib/api";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import * as XLSX from "xlsx";
@@ -178,10 +178,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
 
   const loadFileAsBlob = async (url: string): Promise<string | null> => {
     try {
-      // Extract the endpoint path from the full URL
-      const urlObj = new URL(url);
-      const endpoint = urlObj.pathname + urlObj.search;
-      const response = await authenticatedFetch(endpoint);
+      const response = await fetch(url, createAuthenticatedFetchOptions());
       if (!response.ok) {
         throw new Error("Failed to fetch file");
       }
@@ -202,10 +199,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
   const loadExcelFile = async (url: string) => {
     setExcelLoading(true);
     try {
-      // Extract the endpoint path from the full URL
-      const urlObj = new URL(url);
-      const endpoint = urlObj.pathname + urlObj.search;
-      const response = await authenticatedFetch(endpoint);
+      const response = await fetch(url, createAuthenticatedFetchOptions());
       if (!response.ok) {
         throw new Error("Failed to fetch Excel file");
       }
