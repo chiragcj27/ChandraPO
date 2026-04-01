@@ -43,6 +43,7 @@ function DashboardPage() {
   const gridApiRef = useRef<GridApi<PurchaseOrder> | null>(null);
   const searchQueryRef = useRef<string>("");
   const activeFiltersRef = useRef<{ clientName?: string; status?: string }>({});
+  const hasLoadedClientsRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [deletingPO, setDeletingPO] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ poNumber: string; clientName: string } | null>(null);
@@ -371,16 +372,17 @@ function DashboardPage() {
   const onGridReady = useCallback(
     (params: GridReadyEvent<PurchaseOrder>) => {
       gridApiRef.current = params.api;
-      // Set datasource once when grid is ready
-      params.api.setGridOption("datasource", infiniteDatasource);
     },
-    [infiniteDatasource],
+    [],
   );
 
   const SEARCH_DEBOUNCE_MS = 500;
 
   // When search changes, debounce before updating the ref and refreshing the grid (avoids an API call on every keystroke)
   useEffect(() => {
+    // Skip refresh when search value has not actually changed (e.g. initial mount with empty string)
+    if (searchQueryRef.current === searchQuery) return;
+
     const t = setTimeout(() => {
       searchQueryRef.current = searchQuery;
       if (gridApiRef.current) {
@@ -393,8 +395,11 @@ function DashboardPage() {
   // Load clients on mount for admins
   useEffect(() => {
     if (isAdmin) {
+      if (hasLoadedClientsRef.current) return;
+      hasLoadedClientsRef.current = true;
       void loadClients();
     } else {
+      hasLoadedClientsRef.current = false;
       setClients([]);
     }
   }, [isAdmin]);

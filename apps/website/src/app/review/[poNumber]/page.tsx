@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use, useRef } from "react";
+import { useEffect, useState, use, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PurchaseOrder, POItem } from "@/types/po";
@@ -31,6 +31,8 @@ async function getMockPO(poNumber: string): Promise<PurchaseOrder | null> {
   }
 }
 
+const DOCUMENT_CACHE_NAME = "review-documents-v1";
+
 function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
   const { poNumber } = use(params);
   const router = useRouter();
@@ -44,6 +46,8 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
   const [fileType, setFileType] = useState<"pdf" | "excel" | null>(null);
   const [excelData, setExcelData] = useState<{ sheetName: string; data: (string | number)[][] }[]>([]);
   const [excelLoading, setExcelLoading] = useState(false);
+  const [documentLoading, setDocumentLoading] = useState(false);
+  const [documentError, setDocumentError] = useState<string>("");
   const [usingMock, setUsingMock] = useState(false);
   const [isAddingNewItem, setIsAddingNewItem] = useState(false);
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
@@ -78,31 +82,8 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
             if (data.PO && data.PO.length > 0) {
               const s3Url = data.PO.find((p: string) => p.startsWith("http://") || p.startsWith("https://"));
               const filePath = s3Url || data.PO.find((p: string) => p.includes("uploads/")) || data.PO[0];
-              // Fetch file as blob and create object URL for iframe/embedding
               const fileUrl = getApiEndpoint(`/po/${decodedPoNumber}/pdf?file=${encodeURIComponent(filePath)}`);
-              
-              // Detect file type
-              const fileName = filePath.split('/').pop() || filePath;
-              const ext = fileName.toLowerCase().split('.').pop();
-              if (ext === 'xlsx' || ext === 'xls') {
-                setFileType('excel');
-                // Load Excel file
-                loadExcelFile(fileUrl);
-                // Also set PDF URL for download links
-                loadFileAsBlob(fileUrl).then(blobUrl => {
-                  if (blobUrl) {
-                    setPdfUrl(blobUrl);
-                  }
-                });
-              } else {
-                setFileType('pdf');
-                // Load PDF as blob for iframe
-                loadFileAsBlob(fileUrl).then(blobUrl => {
-                  if (blobUrl) {
-                    setPdfUrl(blobUrl);
-                  }
-                });
-              }
+              loadDocument(filePath, fileUrl);
             }
             setLoading(false);
             return;
@@ -127,31 +108,8 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
           if (mockPO.PO && mockPO.PO.length > 0) {
             const s3Url = mockPO.PO.find((p: string) => p.startsWith("http://") || p.startsWith("https://"));
             const filePath = s3Url || mockPO.PO.find((p: string) => p.includes("uploads/")) || mockPO.PO[0];
-            // For mock data, try to use backend endpoint if available
             const fileUrl = getApiEndpoint(`/po/${decodedPoNumber}/pdf?file=${encodeURIComponent(filePath)}`);
-            
-            // Detect file type
-            const fileName = filePath.split('/').pop() || filePath;
-            const ext = fileName.toLowerCase().split('.').pop();
-            if (ext === 'xlsx' || ext === 'xls') {
-              setFileType('excel');
-              // Load Excel file
-              loadExcelFile(fileUrl);
-              // Also set PDF URL for download links
-              loadFileAsBlob(fileUrl).then(blobUrl => {
-                if (blobUrl) {
-                  setPdfUrl(blobUrl);
-                }
-              });
-            } else {
-              setFileType('pdf');
-              // Load PDF as blob for iframe
-              loadFileAsBlob(fileUrl).then(blobUrl => {
-                if (blobUrl) {
-                  setPdfUrl(blobUrl);
-                }
-              });
-            }
+            loadDocument(filePath, fileUrl);
           }
         } else {
           console.error("PO not found in mock data either");
@@ -176,9 +134,29 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     };
   }, []);
 
-  const loadFileAsBlob = async (url: string): Promise<string | null> => {
-    try {
+  const fetchFileWithCache = useCallback(async (url: string): Promise<Response> => {
+    const request = new Request(url, { method: "GET" });
+
+    if (typeof window !== "undefined" && "caches" in window) {
+      const cache = await caches.open(DOCUMENT_CACHE_NAME);
+      const cached = await cache.match(request);
+      if (cached) {
+        return cached;
+      }
+
       const response = await fetch(url, createAuthenticatedFetchOptions());
+      if (response.ok) {
+        await cache.put(request, response.clone());
+      }
+      return response;
+    }
+
+    return fetch(url, createAuthenticatedFetchOptions());
+  }, []);
+
+  const loadFileAsBlob = useCallback(async (url: string): Promise<string | null> => {
+    try {
+      const response = await fetchFileWithCache(url);
       if (!response.ok) {
         throw new Error("Failed to fetch file");
       }
@@ -194,12 +172,12 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
       console.error("Error loading file as blob:", error);
       return null;
     }
-  };
+  }, [fetchFileWithCache]);
 
-  const loadExcelFile = async (url: string) => {
+  const loadExcelFile = useCallback(async (url: string) => {
     setExcelLoading(true);
     try {
-      const response = await fetch(url, createAuthenticatedFetchOptions());
+      const response = await fetchFileWithCache(url);
       if (!response.ok) {
         throw new Error("Failed to fetch Excel file");
       }
@@ -228,7 +206,36 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
     } finally {
       setExcelLoading(false);
     }
-  };
+  }, [fetchFileWithCache]);
+
+  const loadDocument = useCallback(async (filePath: string, fileUrl: string) => {
+    setDocumentLoading(true);
+    setDocumentError("");
+    setPdfUrl("");
+    setExcelData([]);
+
+    const fileName = filePath.split("/").pop() || filePath;
+    const ext = fileName.toLowerCase().split(".").pop();
+    const isExcel = ext === "xlsx" || ext === "xls";
+    setFileType(isExcel ? "excel" : "pdf");
+
+    try {
+      if (isExcel) {
+        await loadExcelFile(fileUrl);
+      }
+      const blobUrl = await loadFileAsBlob(fileUrl);
+      if (blobUrl) {
+        setPdfUrl(blobUrl);
+      } else {
+        setDocumentError("Failed to load document");
+      }
+    } catch (error) {
+      console.error("Error loading document:", error);
+      setDocumentError("Failed to load document");
+    } finally {
+      setDocumentLoading(false);
+    }
+  }, [loadExcelFile, loadFileAsBlob]);
 
   const handleToggleIncomplete = (index: number) => {
     const updatedItems = [...items];
@@ -1084,7 +1091,18 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
             )}
           </div>
           <div className="flex-1 overflow-hidden p-4 bg-slate-50">
-            {pdfUrl ? (
+            {documentLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <svg className="animate-spin h-10 w-10 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p className="text-slate-700 font-medium mb-1">Loading document...</p>
+                  <p className="text-sm text-slate-500">Please wait while we prepare the viewer</p>
+                </div>
+              </div>
+            ) : pdfUrl ? (
               fileType === 'excel' ? (
                 <div className="w-full h-full flex flex-col overflow-hidden">
                   {excelLoading ? (
@@ -1184,6 +1202,18 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
                   style={{ minHeight: 0 }}
                 />
               )
+            ) : documentError ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <p className="text-slate-700 font-medium mb-1">{documentError}</p>
+                  <p className="text-sm text-slate-500">Try refreshing the page or check your network connection</p>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
