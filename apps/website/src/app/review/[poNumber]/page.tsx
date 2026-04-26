@@ -471,11 +471,11 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
   const handleExportCompletedItems = async () => {
     if (!po || !items.length) return;
 
-    // Filter: ALL completed items (regardless of export status)
-    const completedItems = items.filter((item) => !item.IsIncomplete);
-    
-    if (completedItems.length === 0) {
-      alert("There are no completed items to export yet.");
+    // Export all items (both complete and incomplete)
+    const allItems = items;
+
+    if (allItems.length === 0) {
+      alert("There are no items to export yet.");
       return;
     }
 
@@ -512,7 +512,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
       "StoneQuality"
     ];
 
-    const exportRows = completedItems.map((item, index) => {
+    const exportRows = allItems.map((item, index) => {
       // Helper function to format date as YYYY-MM-DD
       const formatDateForExcel = (date: Date | string | null | undefined): string => {
         if (!date) return "";
@@ -564,10 +564,10 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
       ...exportRows // Data rows
     ]);
     const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, "Completed Items");
+    xlsx.utils.book_append_sheet(workbook, worksheet, "All Items");
 
     const safePONumber = (po.PONumber || decodeURIComponent(poNumber)).replace(/[^\w\-]+/g, "_");
-    xlsx.writeFile(workbook, `${safePONumber}_all_completed_items.xlsx`);
+    xlsx.writeFile(workbook, `${safePONumber}_all_items.xlsx`);
   };
 
   const handleExportSessionCompletedItems = async () => {
@@ -1306,7 +1306,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
                       Add Item
                     </button>
                   )}
-                  {!isAddingNewItem && completedCount > 0 && (
+                  {!isAddingNewItem && items.length > 0 && (
                     <>
                       <button
                         type="button"
@@ -1316,7 +1316,7 @@ function ReviewPage({ params }: { params: Promise<{ poNumber: string }> }) {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        Export All Completed
+                        Export All Items
                       </button>
                       {itemsCompletedInSession.size > 0 && (
                         <button
